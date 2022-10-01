@@ -1,0 +1,57 @@
+<?php namespace ProcessWire;
+
+class BlocksSlider extends WireData implements Module {
+
+  public static function getModuleInfo() {
+    return [
+      'title' => 'Slider Block',
+      'summary' => 'Installs Template and Fields for a PageGrid Block',
+      'author' => 'Jan Ploch',
+      'icon' => 'ellipsis-h',
+      'autoload' => 'template=admin',
+      'requires' => array('PageGridBlocks'),
+      'version' => 001
+    ];
+  }
+
+  public function getBlockName() {
+    return array(
+      'name' => 'pg_slider',
+      'label' => 'Slider',
+    );
+  }
+
+  //function to create block
+  public function createBlock() {
+
+    $b = $this->modules->get('PageGridBlocks');
+    $blockName = $this->getBlockName()['name'];
+    $blockLabel = $this->getBlockName()['label'];
+    $blockIcon = $this->getModuleInfo()['icon'];
+    $folderName = $this->className();
+
+    $b->createTemplate($blockName, $blockLabel, $blockIcon, $folderName);
+
+    $f = $b->createField('pg_slider_autoplay', 'FieldtypeTextarea', $blockName);
+    $f->label = 'Autoplay';
+    $f->note = 'False, or number for milliseconds';
+    $f->inputfieldClass = 'InputfieldText';
+    $f->contentType = 1;
+    $f->save();
+
+  }
+
+  public function ___upgrade($fromVersion, $toVersion) {
+    $this->createBlock();
+  }
+
+  public function ___install() {
+    $this->createBlock();
+  }
+
+  public function ___uninstall() {
+    $blockName = $this->getBlockName()['name'];
+    $this->modules->get('PageGridBlocks')->removeBlock($blockName);
+  }
+  
+}

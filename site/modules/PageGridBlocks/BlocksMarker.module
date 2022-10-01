@@ -1,0 +1,59 @@
+<?php namespace ProcessWire;
+
+class BlocksMarker extends WireData implements Module {
+
+  public static function getModuleInfo() {
+    return [
+      'title' => 'Marker Block',
+      'summary' => 'Installs Template and Fields for a PageGrid Block',
+      'author' => 'Jan Ploch',
+      'icon' => 'map-pin',
+      'autoload' => 'template=admin',
+      'requires' => array('PageGridBlocks'),
+      'version' => 001
+    ];
+  }
+
+  public function getBlockName() {
+    return array(
+      'name' => 'pg_marker',
+      'label' => 'Marker',
+    );
+  }
+
+  //function to create block
+  public function createBlock() {
+
+    $b = $this->modules->get('PageGridBlocks');
+    $blockName = $this->getBlockName()['name'];
+    $blockLabel = $this->getBlockName()['label'];
+    $blockIcon = $this->getModuleInfo()['icon'];
+    $folderName = $this->className();
+
+    $b->createTemplate($blockName, $blockLabel, $blockIcon, $folderName);
+
+    $f = $b->createField($blockName . '_label', 'FieldtypeText', $blockName);
+    $f->textformatters = array(0 => 'TextformatterEntities');
+    $f->label = 'Marker Label';
+    $f->save();
+    
+    $f = $b->createField($blockName, 'FieldtypeTextarea', $blockName);
+    $f->label = $blockLabel;
+    $f->save();
+    
+  }
+
+  public function ___upgrade($fromVersion, $toVersion) {
+    $this->createBlock();
+  }
+
+  public function ___install() {
+    $this->createBlock();
+  }
+
+  public function ___uninstall() {
+    $blockName = $this->getBlockName()['name'];
+    $this->modules->get('PageGridBlocks')->removeBlock($blockName);
+  }
+  
+}

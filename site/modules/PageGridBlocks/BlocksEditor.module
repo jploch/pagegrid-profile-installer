@@ -1,0 +1,66 @@
+<?php
+
+namespace ProcessWire;
+
+class BlocksEditor extends WireData implements Module {
+
+  public static function getModuleInfo() {
+    return [
+      'title' => 'Editor Block',
+      'summary' => 'Installs Template and Fields for a PageGrid Block',
+      'author' => 'Jan Ploch',
+      'icon' => 'font',
+      'autoload' => 'template=admin',
+      'requires' => array('PageGridBlocks'),
+      'version' => 001
+    ];
+  }
+
+  public function getBlockName() {
+    return array(
+      'name' => 'pg_editor',
+      'label' => 'Editor',
+    );
+  }
+
+  //function to create block
+  public function createBlock() {
+    $b = $this->modules->get('PageGridBlocks');
+    $blockName = $this->getBlockName()['name'];
+    $blockLabel = $this->getBlockName()['label'];
+    $blockIcon = $this->getModuleInfo()['icon'];
+    $folderName = $this->className();
+
+    $b->createTemplate($blockName, $blockLabel, $blockIcon, $folderName);
+
+    $editorJS = 'mystyles:/site/templates/blocks/pg_editor_styles.js';
+    $f = $b->createField($blockName, 'FieldtypeTextarea', $blockName);
+    $f->inputfieldClass = 'InputfieldCKEditor';
+    $f->label = $blockLabel;
+    $f->contentType = 1;
+    $f->htmlOptions = array(0 => 2);
+    $f->inlineMode = 1;
+    $f->useACF = 1;
+    $f->usePurifier = 0;
+    $f->toolbar = 'Styles, Bold, Italic, RemoveFormat, JustifyLeft, JustifyCenter, JustifyRight, JustifyBlock
+NumberedList, BulletedList, Blockquote
+PWLink, Unlink, Anchor
+PWImage, Table, HorizontalRule, SpecialChar
+Scayt, Sourcedialog, Loremipsum, ckeditorfa';
+    $f->stylesSet = $editorJS;
+    $f->save();
+  }
+
+  public function ___upgrade($fromVersion, $toVersion) {
+    $this->createBlock();
+  }
+
+  public function ___install() {
+    $this->createBlock();
+  }
+
+  public function ___uninstall() {
+    $blockName = $this->getBlockName()['name'];
+    $this->modules->get('PageGridBlocks')->removeBlock($blockName);
+  }
+}

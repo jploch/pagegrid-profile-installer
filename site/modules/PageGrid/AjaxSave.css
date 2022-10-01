@@ -1,0 +1,61 @@
+.autosave_dialog {
+  position: fixed;
+  z-index: 25;
+  top: 75px;
+  left: 0;
+  margin: 0 auto;
+  /*    left: 30%; right:30%;*/
+  padding: 10px;
+  font-size: 16px;
+  text-align: center;
+  width: 100%;
+  height: 50px;
+  border-top: 1px solid #fff;
+}
+
+.modal .autosave_dialog {
+  top: 0;
+}
+
+.autosave_message {
+  background-color: #eee;
+  color: #333;
+}
+
+.autosave_message:before {
+  content: "\f14a";
+  display: inline-block;
+  font: normal normal normal 14px/1 FontAwesome;
+  font-size: inherit;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin-right: 5px;
+}
+
+.autosave_error {
+  background-color: #cb1000;
+  color: #ffffff;
+}
+
+/*ajax save only for adminbar*/
+.modal #submit_save,
+.modal #submit_save_copy,
+.modal #pw-dropdown-toggle-submit_save,
+.modal #pw-dropdown-toggle-submit_save_copy,
+.modal #submit_save_unpublished,
+.modal #pw-dropdown-toggle-submit_save_unpublished,
+.modal #submit_save_unpublished_copy,
+.modal #pw-dropdown-toggle-submit_save_unpublished_copy {
+  /*     display: none !important;*/
+}
+
+#ajax_save_copy,
+#ajax_save {
+  display: none !important;
+}
+
+.modal #ajax_save_copy,
+.modal #ajax_save {
+  /*     display: block !important;*/
+}
