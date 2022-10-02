@@ -3,7 +3,7 @@ ProcessWire PageGrid
 
 Copyright (C) 2022 by Jan Ploch
 
-> PageGrid is a commercial module for ProcessWire that renders page items as CSS Grid and adds drag and drop functionality in admin.
+> PageGrid is a commercial module for ProcessWire that renders PageTable entries as CSS Grid and adds drag and drop functionality in admin
 
 
 ## DO NOT SHARE OR DISTRIBUTE
@@ -24,7 +24,7 @@ Copyright (C) 2022 by Jan Ploch
 
 ## Getting support
 
-PageGrid documentation: <https://page-grid.com/docs/>
+PageGrid documentation: <https://page-grid.com/documentation/>
 
 Your PageGrid service includes 1-year of VIP support through the PageGrid Support forum. 
 Your account should be active upon completing your purchase. 

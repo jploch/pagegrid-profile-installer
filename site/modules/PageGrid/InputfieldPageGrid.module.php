@@ -1343,8 +1343,10 @@ class InputfieldPageGrid extends Inputfield
                     $tag = $this->getTagName($options["pageId"]);
                 }
 
+                $tags = isset($options["tags"]) ? $options["tags"] : "";
+
                 if ($tag == 'div' || $tag == 'DIV') {
-                    $renderOptions .= 'data-pg-tagName="h2" data-pg-tags="h1 h2 h3 h4 h5 h6 p"';
+                    $renderOptions .= 'data-pg-tagName="h2" data-pg-tags="'.$tags.'"';
                 }
             }
 
