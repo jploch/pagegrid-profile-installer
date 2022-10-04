@@ -43,7 +43,7 @@ $field->addOption("h3");
 $field->addOption("h4");
 $field->addOption("h5");
 $field->addOption("h6");
-// $field->addOption("p");
+$field->addOption("p");
 $field->set('value', 'h2');
 $field->addClass('label-left', 'wrapClass');
 //$field->addClass( 'hide-label', 'headerClass' );

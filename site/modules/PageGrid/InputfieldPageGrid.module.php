@@ -18,7 +18,7 @@ class InputfieldPageGrid extends Inputfield
         return array(
             'title' => __('PageGrid Inputfield', __FILE__), // Module Title
             'summary' => __('Adds Inputfield for PageGrid', __FILE__), // Module Summary
-            'version' => 233,
+            'version' => 001,
             'author' => 'Jan Ploch',
             'icon' => 'th',
             'permanent' => false,
@@ -1343,14 +1343,12 @@ class InputfieldPageGrid extends Inputfield
                     $tag = $this->getTagName($options["pageId"]);
                 }
 
-                $tags = isset($options["tags"]) ? $options["tags"] : "";
-
                 if ($tag == 'div' || $tag == 'DIV') {
-                    $renderOptions .= 'data-pg-tagName="h2" data-pg-tags="'.$tags.'"';
+                    $renderOptions .= 'data-pg-tagName="h2" data-pg-tags="h1 h2 h3 h4 h5 h6 p"';
                 }
             }
-
-            echo '<div class="pg-data"' . $renderOptions . '></div>';
+            // needs span instead of div to work inside p tags
+            echo '<span class="pg-data"' . $renderOptions . '></span>';
         }
     }
 

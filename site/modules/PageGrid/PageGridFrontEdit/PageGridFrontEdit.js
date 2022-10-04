@@ -112,15 +112,15 @@ function PageGridFrontEditInit($) {
 			return false;
 		});
 
-		if (t.is('span')) { // single-line text
-			// via @canrau
-			copy.keydown(function (e) {
-				if (e.keyCode == 13) {
-					e.preventDefault();
-					$(this).blur();
-				}
-			});
-		}
+		// if (t.is('span')) { // single-line text
+		// 	// via @canrau
+		// 	copy.keydown(function (e) {
+		// 		if (e.keyCode == 13) {
+		// 			e.preventDefault();
+		// 			$(this).blur();
+		// 		}
+		// 	});
+		// }
 
 		// check if orig has clickable links within it
 		// if so, differentiate between single and double clicks

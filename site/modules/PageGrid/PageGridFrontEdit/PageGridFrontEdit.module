@@ -22,7 +22,7 @@ class PageGridFrontEdit extends WireData implements Module {
 		return array(
 			'title' => 'PageGrid Front-End Editor',
 			'summary' => 'Enables front-end editing for PageGrid',
-			'version' => 3,
+			'version' => 0.2,
 			'author' => 'Ryan Cramer, Jan Ploch',
 			'license' => 'MPL 2.0',
 			'icon' => 'cube', 
@@ -846,7 +846,9 @@ class PageGridFrontEdit extends WireData implements Module {
 		$inputfield->renderReady(null, false);
 
 		// use div tags for 'textarea' fields and 'span' tags for text fields
-		$tag = $field->type instanceof FieldtypeTextarea ? 'div' : 'span';
+		// $tag = $field->type instanceof FieldtypeTextarea ? 'div' : 'span';
+		// JP allways use span instead of div to work inside p tags, only ckeditor needs div
+		$tag = $inputfield instanceof InputfieldCKEditor ? 'div' : 'span';
 
 		// return the editor markup
 		$this->editorNum++;
@@ -878,7 +880,7 @@ class PageGridFrontEdit extends WireData implements Module {
 	protected function modalRenderEditor(Page $page, array $fields, $markup) {
 
 		$modalID = $this->getModalID($page, $fields);
-		$tag = "div";
+		$tag = "span";
 		$_fields = array();
 		foreach($fields as $field) $_fields[] = $field->name;
 		$fieldsStr = implode(',', $_fields);
