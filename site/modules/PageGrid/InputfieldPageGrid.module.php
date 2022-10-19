@@ -42,9 +42,6 @@ class InputfieldPageGrid extends Inputfield
 
         // load script for style tab
         $this->config->scripts->add($this->config->urls->InputfieldPageGrid . "wireTabs.js'");
-
-        //hide settings from pagetable, that need to be there but not visible
-        $this->config->styles->add($this->config->urls->InputfieldPageGrid . "fieldsettings.css");
     }
 
     public function init()
@@ -83,6 +80,44 @@ class InputfieldPageGrid extends Inputfield
         }
 
         return $this->renderField();
+    }
+
+    public function getData() {
+       //make data available to js
+       $globalPage = $this->pages->get('pg-classes');
+       $globalPageData = [];
+       $globalPageData[$globalPage->id] = [];
+
+       foreach ($globalPage->find('') as $child) {
+           $itemData = $child->meta()->pg_styles;
+           if (isset($itemData)) {
+               foreach ($itemData as $childData) {
+                   if (isset($childData['id'])) {
+                       $globalPageData[$globalPage->id][$child->name] = $childData;
+                   }
+               }
+           }
+       }
+
+       //just get all data, this will work for nested items, as well as ref fields, performance?
+       $pageItems = $this->pages->get('pg-items');
+       $itemsArray = new PageArray();
+
+       foreach ($pageItems->children() as $child) {
+           $itemsArray->add($child);
+           foreach ($child->find('') as $c) {
+               $itemsArray->add($c);
+           }
+       }
+
+       foreach ($itemsArray as $child) {
+           $itemData = $child->meta()->pg_styles;
+           if (isset($itemData)) {
+               $globalPageData[$child->id] = $itemData;
+           }
+       }
+
+       return json_encode($globalPageData); 
     }
 
     public function ___renderField()
@@ -135,14 +170,14 @@ class InputfieldPageGrid extends Inputfield
             $itemsParent->save();
         }
 
-        // set field name to item meta, not needed, but convinient
+        // set field name to item meta, not needed, but convinient?
         $pagesToRender = $itemsParent->find('');
         $itemsParent->meta()->set('pg_field', $this->name);
 
         foreach ($pagesToRender as $pgItem) {
             $pgItem->meta()->set('pg_field', $this->name);
         }
-        // END set field name to item meta, not needed, but convinient
+        // END set field name to item meta, not needed, but convinient?
 
         //import old data
         // $pagesToRenderOld = $this->attr('value');
@@ -163,41 +198,7 @@ class InputfieldPageGrid extends Inputfield
         $addItems = '';
 
         //make data available to js
-        $globalPage = $this->pages->get('pg-classes');
-        $dataGlobal = '';
-        $globalPageData = [];
-        $globalPageData[$globalPage->id] = [];
-
-        foreach ($globalPage->find('') as $child) {
-            $itemData = $child->meta()->pg_styles;
-            if (isset($itemData)) {
-                foreach ($itemData as $childData) {
-                    if (isset($childData['id'])) {
-                        $globalPageData[$globalPage->id][$child->name] = $childData;
-                    }
-                }
-            }
-        }
-
-        //just get all data, this will work for nested items, as well as ref fields, performance?
-        $pageItems = $this->pages->get('pg-items');
-        $itemsArray = new PageArray();
-
-        foreach ($pageItems->children() as $child) {
-            $itemsArray->add($child);
-            foreach ($child->find('') as $c) {
-                $itemsArray->add($c);
-            }
-        }
-
-        foreach ($itemsArray as $child) {
-            $itemData = $child->meta()->pg_styles;
-            if (isset($itemData)) {
-                $globalPageData[$child->id] = $itemData;
-            }
-        }
-
-        $globalPageData = json_encode($globalPageData);
+        $globalPageData = $this->getData();
         $dataGlobal = '<script>$(".pg-container").data("pg", ' . $globalPageData . ')</script>';
         //END make data available to js
 
@@ -313,6 +314,10 @@ class InputfieldPageGrid extends Inputfield
         $error = '<div style="padding:30px;"><h2>your PageGrid license is invalid :(</h2><br><a style="text-decoration:underline;" title="Got to settings" href="' . $this->config->urls->admin . 'module/edit?name=FieldtypePageGrid&collapse_info=1">Enter license key</a></div>';
 
         if ($host == $licence_url) {
+            $validHost = true;
+        }
+
+        if (wire('user')->isSuperuser == 0) {
             $validHost = true;
         }
 

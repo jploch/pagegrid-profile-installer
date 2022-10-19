@@ -134,7 +134,7 @@ class PageGridFrontEdit extends WireData implements Module {
 		
 		// check if we should allow editor for current page
 		$page = $this->wire('page');
-		if($page->template == 'admin') return;
+		// if($page->template == 'admin') return;
 
 		//JP option to set page, to ready inline editor after ajax
 		if ($p) {
@@ -847,8 +847,9 @@ class PageGridFrontEdit extends WireData implements Module {
 
 		// use div tags for 'textarea' fields and 'span' tags for text fields
 		// $tag = $field->type instanceof FieldtypeTextarea ? 'div' : 'span';
-		// JP allways use span instead of div to work inside p tags, only ckeditor needs div
-		$tag = $inputfield instanceof InputfieldCKEditor ? 'div' : 'span';
+
+		// JP custom html tag also works with inline elements (div is not working inside p)
+		$tag = 'editor';
 
 		// return the editor markup
 		$this->editorNum++;
@@ -880,7 +881,7 @@ class PageGridFrontEdit extends WireData implements Module {
 	protected function modalRenderEditor(Page $page, array $fields, $markup) {
 
 		$modalID = $this->getModalID($page, $fields);
-		$tag = "span";
+		$tag = "div";
 		$_fields = array();
 		foreach($fields as $field) $_fields[] = $field->name;
 		$fieldsStr = implode(',', $_fields);

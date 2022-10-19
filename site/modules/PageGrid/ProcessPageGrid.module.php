@@ -50,6 +50,7 @@ class ProcessPageGrid extends Process
         }
 
         $pageId = isset($_POST['pageId']) ? $this->sanitizer->int($_POST['pageId']) : '';
+        $insertAfter = isset($_POST['insertAfter']) ? $this->sanitizer->int($_POST['insertAfter']) : '';
         $parentId = isset($_POST['parentId']) ? $this->sanitizer->int($_POST['parentId']) : '';
         $templateId = isset($_POST['templateId']) ? $this->sanitizer->text($_POST['templateId']) : '';
         $pgField = isset($_POST['pgField']) ? $this->sanitizer->text($_POST['pgField']) : '';
@@ -182,34 +183,57 @@ class ProcessPageGrid extends Process
             return;
         }
 
+        if($type === 'getData') {
+            //already JSON encoded
+            $globalPageData = $this->modules->get('InputfieldPageGrid')->getData();
+            return ($globalPageData);
+        }
+
         if ($type === 'clone' && !empty($_POST['pageId'])) {
 
             $markupHeader = '';
 
             $p = $this->pages->get($pageId);
+            $insertAfter = $this->pages->get($insertAfter);
             $newPages = array();
             $clone = $this->pages->clone($p);
+
+            //insert after different item than clone if copy to another page
+            if ($insertAfter->id) {
+
+                if($insertAfter->template->name == 'pg_container') {
+                    $clone->parent = $insertAfter;
+                    $clone->save();
+                } else {
+                    $this->pages->insertAfter($clone, $insertAfter);
+                }
+            }
 
             $templateName = str_replace('_', '-', $p->template->name);
             $clone->setAndSave('name', $templateName . '-' . $clone->id);
             $clone->setAndSave('title', $templateName . '-' . $clone->id);
-            $newPages[$p->name] = $clone->name;
+
+            // $newPages array to keep a refernce to old pages
+            $newPages[$p->id] = $clone->id;
 
             //add header and css for clone
             $markupHeader = $this->modules->get('InputfieldPageGrid')->renderHeader($clone);
             $css = $this->modules->get('InputfieldPageGrid')->renderStyles($clone);
 
+            //set page id as meta for children to load data from original via $newPages
+            foreach ($p->find('') as $pChild) {
+                $pChild->meta()->set('old_id', $pChild->id);
+            }
+
             // rename children, for unique ID and add child header
             foreach ($clone->find('') as $cloneChild) {
-                $oldName = $cloneChild->name;
                 $templateName = str_replace('_', '-', $cloneChild->template->name);
                 $cloneChild->setAndSave('name', $templateName . '-' . $cloneChild->id);
                 $cloneChild->setAndSave('title', $templateName . '-' . $cloneChild->id);
-                $newPages[$oldName] = $cloneChild->name;
+                $newPages[$cloneChild->meta('old_id')] = $cloneChild->id;
                 $markupHeader .= $this->modules->get('InputfieldPageGrid')->renderHeader($cloneChild);
                 $css .= $this->modules->get('InputfieldPageGrid')->renderStyles($cloneChild);
             }
-
 
             $response = array(
                 'markupHeader' => $markupHeader,
