@@ -388,6 +388,10 @@ a:active.cke_colormore {
   border-left: 1px solid #ccc;
 }
 
+.cke_toolbox span:first-child .cke_toolgroup {
+  border-left: none;
+}
+
 .cke_hc .cke_toolgroup {
   border: 0;
   margin-right: 10px;
