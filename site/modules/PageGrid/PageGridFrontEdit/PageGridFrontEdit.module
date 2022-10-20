@@ -848,8 +848,8 @@ class PageGridFrontEdit extends WireData implements Module {
 		// use div tags for 'textarea' fields and 'span' tags for text fields
 		// $tag = $field->type instanceof FieldtypeTextarea ? 'div' : 'span';
 
-		// JP custom html tag also works with inline elements (div is not working inside p)
-		$tag = 'editor';
+		// JP allways use span instead of div to work inside p tags, only ckeditor needs div
+		$tag = $inputfield instanceof InputfieldCKEditor ? 'div' : 'span';
 
 		// return the editor markup
 		$this->editorNum++;
