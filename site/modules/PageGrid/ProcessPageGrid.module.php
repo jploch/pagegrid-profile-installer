@@ -178,6 +178,14 @@ class ProcessPageGrid extends Process
 
         if ($type === 'delete' && !empty($removeId)) {
             $p = $this->pages->get($removeId);
+            $p->removeStatus(Page::statusLocked);
+            $p->save();
+
+            foreach($p->find('') as $item) {
+                $item->removeStatus(Page::statusLocked);
+                $item->save();
+            }
+
             $p->trash();
             $this->log->save("pagegrid", "page removed: " . $removeId);
             return;

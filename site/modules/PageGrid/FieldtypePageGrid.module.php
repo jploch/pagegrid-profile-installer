@@ -265,6 +265,12 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
         if (!$field->type instanceof FieldtypePageGrid) continue;
         $itemsParent = $pages->get('pg-' . $page->id);
         if ($itemsParent->id) {
+
+          foreach($itemsParent->find('') as $item) {
+            $item->removeStatus(Page::statusLocked);
+            $item->save();
+        }
+
           $itemsParent->delete(true); // true allown to delete children too
           $this->message("PageGrid items for " . $page->id . " removed");
         }
