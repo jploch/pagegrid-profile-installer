@@ -1022,6 +1022,11 @@ class PageGridFrontEdit extends WireData implements Module {
 	 */
 	protected function inlineProcessSaveEdits(array $fields, array $data) {
 
+		// JP return if demo
+		if($this->config->demo) {
+			return;
+		}
+
 		$languages = $this->wire('languages');
 		$language = $languages ? $this->wire('user')->language : null;
 		$pages = $this->wire('pages');
