@@ -1253,7 +1253,7 @@ CREATE TABLE `textformatter_video_embed` (
   `data` text,
   PRIMARY KEY (`video_id`),
   KEY `created` (`created`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
 UPDATE pages SET created_users_id=41, modified_users_id=41, created=NOW(), modified=NOW();
