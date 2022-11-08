@@ -181,7 +181,7 @@ class ProcessPageGrid extends Process
             $p->removeStatus(Page::statusLocked);
             $p->save();
 
-            foreach($p->find('') as $item) {
+            foreach ($p->find('') as $item) {
                 $item->removeStatus(Page::statusLocked);
                 $item->save();
             }
@@ -191,7 +191,7 @@ class ProcessPageGrid extends Process
             return;
         }
 
-        if($type === 'getData') {
+        if ($type === 'getData') {
             //already JSON encoded
             $globalPageData = $this->modules->get('InputfieldPageGrid')->getData();
             return ($globalPageData);
@@ -209,7 +209,7 @@ class ProcessPageGrid extends Process
             //insert after different item than clone if copy to another page
             if ($insertAfter->id) {
 
-                if($insertAfter->template->name == 'pg_container') {
+                if ($insertAfter->template->name == 'pg_container') {
                     $clone->parent = $insertAfter;
                     $clone->save();
                 } else {
@@ -317,6 +317,13 @@ class ProcessPageGrid extends Process
         if ($type === 'upload' && !empty($pageId)) {
 
             $p = $this->pages->get($pageId);
+            $fileRelativePath = $p->filesUrl();
+            $extensions = 'jpg jpeg gif png svg';
+            $fileField = 0;
+
+            if (!($p->id)) {
+                return;
+            }
 
             if ($p->hasField($field_name)) {
                 $fileField = $p->$field_name;
@@ -325,38 +332,41 @@ class ProcessPageGrid extends Process
             if ($fileField) {
                 $fileField->deleteAll();
                 $filePath = (string) $fileField->path();
-            }
-
-            if (!($fileField)) {
+                $f = $this->fields->get($field_name);
+                $extensions = $f->extensions ? $f->extensions : '';
+            } else {
                 // add custom path
-                $filePage = $this->pages->get($pageId);
-                $filePath = $filePage->filesManager->path;
-                $fileRelativePath = $filePage->filesUrl();
+                $filePath = $p->filesManager->path;
             }
 
+            $extensionArray = explode(" ", $extensions);
             $u = new WireUpload('preview_name');
             $u->setMaxFiles(1);
             $u->setOverwrite(false);
             //            $filePath = ( string ) $fileField->path();
             $u->setDestinationPath($filePath);
+            $u->setValidExtensions($extensionArray);
 
-            $u->setValidExtensions(array('jpg', 'jpeg', 'gif', 'png', 'svg', 'mp4'));
+            // execute upload and check for errors
+            $filename = $u->execute();
+
+            //check if upload has errors and is correct file type
+            if (!count($filename)) {
+                header('HTTP/1.1 500 Internal Server Booboo');
+                header('Content-Type: application/json; charset=UTF-8');
+                die('Sorry, this file type is not supported! Upload one of these files: ' . $extensions);
+                // return false;
+            }
+
             foreach ($u->execute() as $filename) {
-
                 if ($fileField) {
                     $fileField->add($filename);
-                } else {
-                    if (move_uploaded_file($filename, $filePath)) {
-                        return $fileRelativePath . $filename;
-                    } else {
-                        return $fileRelativePath . $filename;
-                    }
-                }
+                } 
             }
 
             $this->log->save("pagegrid", $filePath);
-
             $p->save();
+            return $fileRelativePath . $filename;
         }
         //excude end
     }
