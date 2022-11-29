@@ -22,7 +22,7 @@ class PageGridFrontEdit extends WireData implements Module {
 		return array(
 			'title' => 'PageGrid Front-End Editor',
 			'summary' => 'Enables front-end editing for PageGrid',
-			'version' => 0.2,
+			'version' => '0.2',
 			'author' => 'Ryan Cramer, Jan Ploch',
 			'license' => 'MPL 2.0',
 			'icon' => 'cube', 

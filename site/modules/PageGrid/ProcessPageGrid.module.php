@@ -20,7 +20,7 @@ class ProcessPageGrid extends Process
             'icon' => 'th',
             'requires' => array('FieldtypePageGrid'),
             'installs' => array('FieldtypePageGrid', 'InputfieldPageGrid', 'PageGridFrontEdit'),
-            'version' => 1,
+            'version' => '0.0.1',
 
             // page that you want created to execute this module
             'page' => [

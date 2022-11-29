@@ -18,7 +18,7 @@ class InputfieldPageGrid extends Inputfield
         return array(
             'title' => __('PageGrid Inputfield', __FILE__), // Module Title
             'summary' => __('Adds Inputfield for PageGrid', __FILE__), // Module Summary
-            'version' => 001,
+            'version' => '0.0.1',
             'author' => 'Jan Ploch',
             'icon' => 'th',
             'permanent' => false,
