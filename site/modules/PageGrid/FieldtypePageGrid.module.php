@@ -18,7 +18,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
     return array(
       'title' => __('PageGrid'), // Module Title
       'summary' => __('Commercial module that renders PageTable entries as CSS Grid and adds drag and drop functionality in admin', __FILE__), // Module summary
-      'version' => 003,
+      'version' => 009,
       'author' => 'Jan Ploch',
       'icon' => 'th',
       'installs' => array('InputfieldPageGrid', 'ProcessPageGrid', 'PageGridFrontEdit'),
