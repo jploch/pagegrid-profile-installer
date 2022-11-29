@@ -82,42 +82,43 @@ class InputfieldPageGrid extends Inputfield
         return $this->renderField();
     }
 
-    public function getData() {
-       //make data available to js
-       $globalPage = $this->pages->get('pg-classes');
-       $globalPageData = [];
-       $globalPageData[$globalPage->id] = [];
+    public function getData()
+    {
+        //make data available to js
+        $globalPage = $this->pages->get('pg-classes');
+        $globalPageData = [];
+        $globalPageData[$globalPage->id] = [];
 
-       foreach ($globalPage->find('') as $child) {
-           $itemData = $child->meta()->pg_styles;
-           if (isset($itemData)) {
-               foreach ($itemData as $childData) {
-                   if (isset($childData['id'])) {
-                       $globalPageData[$globalPage->id][$child->name] = $childData;
-                   }
-               }
-           }
-       }
+        foreach ($globalPage->find('') as $child) {
+            $itemData = $child->meta()->pg_styles;
+            if (isset($itemData)) {
+                foreach ($itemData as $childData) {
+                    if (isset($childData['id'])) {
+                        $globalPageData[$globalPage->id][$child->name] = $childData;
+                    }
+                }
+            }
+        }
 
-       //just get all data, this will work for nested items, as well as ref fields, performance?
-       $pageItems = $this->pages->get('pg-items');
-       $itemsArray = new PageArray();
+        //just get all data, this will work for nested items, as well as ref fields, performance?
+        $pageItems = $this->pages->get('pg-items');
+        $itemsArray = new PageArray();
 
-       foreach ($pageItems->children() as $child) {
-           $itemsArray->add($child);
-           foreach ($child->find('') as $c) {
-               $itemsArray->add($c);
-           }
-       }
+        foreach ($pageItems->children() as $child) {
+            $itemsArray->add($child);
+            foreach ($child->find('') as $c) {
+                $itemsArray->add($c);
+            }
+        }
 
-       foreach ($itemsArray as $child) {
-           $itemData = $child->meta()->pg_styles;
-           if (isset($itemData)) {
-               $globalPageData[$child->id] = $itemData;
-           }
-       }
+        foreach ($itemsArray as $child) {
+            $itemData = $child->meta()->pg_styles;
+            if (isset($itemData)) {
+                $globalPageData[$child->id] = $itemData;
+            }
+        }
 
-       return json_encode($globalPageData); 
+        return json_encode($globalPageData);
     }
 
     public function ___renderField()
@@ -256,33 +257,9 @@ class InputfieldPageGrid extends Inputfield
             $renderMarkup .= $this->modules->get('InputfieldPageGrid')->renderHeader($item);
 
             // page ref
-            $refField  = 0;
-            $pgField = $this->name;
-
-            foreach ($item->fields as $field) {
-                if ($field->type instanceof FieldtypePage) {
-                    $refField = $field->name;
-                }
-            }
-
-            if ($refField) {
-
-                // get ref page
-                $refPages = $item->$refField;
-
-                if ($refPages) {
-                    // set to array if single object
-                    if (!is_array($refPages)) $refPages = array($refPages);
-
-                    if (count($refPages)) {
-                        foreach ($refPages as $refPage) {
-                            $renderMarkup .= $this->modules->get('InputfieldPageGrid')->renderHeader($refPage);
-                            foreach ($refPage->find('') as $refChild) {
-                                $renderMarkup .= $this->modules->get('InputfieldPageGrid')->renderHeader($refChild);
-                            }
-                        }
-                    }
-                }
+            $refPages = $this->getRef($item);
+            foreach ($refPages as $refPage) {
+                $renderMarkup .= $this->modules->get('InputfieldPageGrid')->renderHeader($refPage);
             }
             // END page ref
 
@@ -296,10 +273,10 @@ class InputfieldPageGrid extends Inputfield
 
         if ($this->renderOptions == 'page') {
             //render whole page
-            $renderMarkup .= '<iframe id="pg-iframe-canvas" src="' . wire('pages')->get($parentPageId)->url . '?backend=1" frameBorder="0" scrolling="yes" style="width:100%; max-height:calc(100vh - 200px); border:0;"></iframe>';
+            $renderMarkup .= '<iframe id="pg-iframe-canvas" src="' . wire('pages')->get($parentPageId)->url . '?backend=1" frameBorder="0" scrolling="no" style="width:100%; max-height:100vh; border:0;"></iframe>';
         } else {
             //render only blocks
-            $renderMarkup .= '<iframe id="pg-iframe-canvas" src="' . $moduleUrl . 'frontend.php?backend=1&id=' . $parentPageId . '" frameBorder="0" scrolling="no" style="width:100%; height:100vh; min-height:300px; overflow:hidden; border:0;"></iframe>';
+            $renderMarkup .= '<iframe id="pg-iframe-canvas" src="' . $moduleUrl . 'frontend.php?backend=1&id=' . $parentPageId . '" frameBorder="0" scrolling="no" style="width:100%; max-height:100vh; min-height:300px; overflow:hidden; border:0;"></iframe>';
         }
 
         $renderMarkup .= '</div>';
@@ -628,8 +605,6 @@ class InputfieldPageGrid extends Inputfield
         //Read item Settings
         $attributes = '';
         $nestedClasses = '';
-        $groupMarkupOpen = '';
-        $groupMarkupClose = '';
 
         // foreach ($p->meta()->pg_styles as $item) {
         //     $item['state'] = '';
@@ -651,9 +626,6 @@ class InputfieldPageGrid extends Inputfield
                     if ($this->user->hasPermission('pagegrid-drag')) {
                         $nestedClasses .= 'pg-sortable ';
                     }
-
-                    $groupMarkupOpen = '<div id="' . $p->name . '" class="pg ' . $this->getCssClasses($p, $parent) . '" data-id="' . $p->id . '" data-field="' . $pg->name . '">';
-                    $groupMarkupClose = '</div>';
                 }
             }
         }
@@ -661,34 +633,16 @@ class InputfieldPageGrid extends Inputfield
         //end Read item Settings
 
         // add class for reffield
-        $refField  = 0;
+        $refPages = $this->getRef($p);
 
-        foreach ($p->fields as $field) {
-            if ($field->type instanceof FieldtypePage) {
-                $refField = $field->name;
-            }
-        }
-
-        if ($refField) {
-
-            // get ref page and check if ist a pagegrid page
-            $refPages = $p->$refField;
-
-            if ($refPages) {
-                // set to array if single object
-                if (!is_array($refPages)) $refPages = array($refPages);
-
-                foreach ($refPages as $refPage) {
-                    if ($refPage->id) {
-                        $refStyle = $refPage->meta()->pg_styles;
-                        if (isset($refStyle)) {
-                            $nestedClasses .= 'pg-ref ';
-                        }
-                    }
+        foreach ($refPages as $refPage) {
+            if ($refPage->id) {
+                $refStyle = $refPage->meta()->pg_styles;
+                if (isset($refStyle)) {
+                    $nestedClasses .= 'pg-ref ';
                 }
             }
         }
-
         // END add class for reffield
 
 
@@ -730,23 +684,11 @@ class InputfieldPageGrid extends Inputfield
         if ($backend) {
 
             $parentPageId = (int) wire('input')->get('id');
-            $pId = $p->id;
-
             $layout .= '<' . $this->getTagName($p->id, $parent) . ' id="' . $p->name . '" data-id="' . $p->id . '" class="' . $this->getCssClasses($p, $parent) . ' ' . $nestedClasses . $statusClass . $imageUploadEmpty . '" data-template="' . $p->template->name . '" data-field="' . $this->name . '" data-name="' . $p->name . '" ' . $attributes . '>';
-
             $layout .= $parsedTemplate->render() . $imageUpload;
-
             $layout .= '</' . $this->getTagName($p->id, $parent) . '>';
-
-            if (!$wrapper) {
-                $layout = $groupMarkupOpen . $parsedTemplate->render() . $groupMarkupClose . $imageUpload;
-            }
         } else {
             $layout = '<' . $this->getTagName($p->id, $parent) . ' class="' . $nestedClasses . $this->getCssClasses($p, $parent) . '" ' . $attributes . '>' . $parsedTemplate->render() . '</' . $this->getTagName($p->id, $parent) . '>';
-
-            if (!$wrapper) {
-                $layout = $groupMarkupOpen . $parsedTemplate->render() . $groupMarkupClose;
-            }
         }
 
         return $layout;
@@ -857,39 +799,15 @@ class InputfieldPageGrid extends Inputfield
             $items->add($mainPage);
         }
 
-        // page ref
-        $refField  = 0;
+        // handle reference fields
+        $itemsArray = new PageArray();
 
         foreach ($items as $item) {
-            foreach ($item->fields as $field) {
-                if ($field->type instanceof FieldtypePage) {
-                    $refField = $field->name;
-                }
-            }
-
-            if ($refField) {
-
-                // get ref page
-                $refPages = $item->$refField;
-
-                if ($refPages) {
-                    // set to array if single object
-                    if (!is_array($refPages)) $refPages = array($refPages);
-
-                    foreach ($refPages as $refPage) {
-                        if ($refPage->id) {
-                            $items->add($refPage);
-
-                            foreach ($refPage->find('') as $refChild) {
-                                $items->add($refChild);
-                            }
-                        }
-                    }
-                }
-            }
+            $refPages = $this->getRef($item);
+            $itemsArray->add($refPages);
         }
-
-        // END page ref
+        $items->add($itemsArray);
+        // END handle reference fields
 
         foreach ($items as $item) {
             $filename = wire('config')->paths->templates . 'blocks/' . $item->template->name . '.js';
@@ -1157,7 +1075,7 @@ class InputfieldPageGrid extends Inputfield
         return $googleFonts;
     }
 
-    public function styles($mainPage, $fieldName = 0, $loadGlobalClasses = 1, $loadFiles = 1, $loadFonts = 1)
+    public function styles($mainPage, $loadDefaults = 1, $loadGlobalClasses = 1, $loadFiles = 1, $loadFonts = 1)
     {
 
         // bd($mainPage);
@@ -1212,7 +1130,7 @@ class InputfieldPageGrid extends Inputfield
         $cssMainPage = $this->renderStyles($mainPage);
 
         //render defaults if mainpage has pg field and field name not set
-        if ($fieldName == 0) {
+        if ($loadDefaults == 1) {
             //get pg field name
             $mainPageTemplate = $mainPage->template;
 
@@ -1233,8 +1151,8 @@ class InputfieldPageGrid extends Inputfield
         }
 
         // if no page with field found check if field name is set to load defaults
-        if ($fieldName) {
-            $pgField = wire('fields')->get($fieldName);
+        if ($loadDefaults && $loadDefaults != 1) {
+            $pgField = wire('fields')->get($loadDefaults);
             if ($pgField->id) {
                 if ($pgField->type instanceof FieldtypePageGrid) {
                     include 'pg-style.php';
@@ -1252,38 +1170,14 @@ class InputfieldPageGrid extends Inputfield
         }
 
         foreach ($items as $item) {
-
             $itemsArray->add($item);
 
             // handle reference fields
-            $refField  = 0;
-
-            foreach ($item->fields as $field) {
-                if ($field->type instanceof FieldtypePage) {
-                    $refField = $field->name;
-                }
-            }
-
-            if ($refField) {
-
-                // get ref page
-                $refPages = $item->$refField;
-
-                if ($refPages) {
-                    // set to array if single object
-                    if (!is_array($refPages)) $refPages = array($refPages);
-
-                    if (count($refPages)) {
-                        foreach ($refPages as $refPage) {
-                            if ($refPage->id) {
-                                $itemsArray->add($refPage);
-                                foreach ($refPage->find('') as $refChild) {
-                                    $itemsArray->add($refChild);
-                                }
-                            }
-                        }
-                    }
-                }
+            $refPages = $this->getRef($item);
+            $itemsArray->add($refPages);
+            foreach ($refPages as $refChild) {
+                $refPages = $this->getRef($refChild);
+                $itemsArray->add($refPages);
             }
             // END handle reference fields
 
@@ -1322,7 +1216,53 @@ class InputfieldPageGrid extends Inputfield
         return $cssTemplates . $cssBackend . $defaults . $fonts . $itemCss;
     }
 
+    public function getRef($item)
+    {
+        // handle reference fields
+        // page array to hold items to load files
+        $itemsArray = new PageArray();
+        $refFields  = array();
 
+        foreach ($item->fields as $field) {
+            if ($field->type instanceof FieldtypePage) {
+                $refFields[$field->name] = $field->name;
+            }
+        }
+
+        foreach ($refFields as $refField) {
+
+            if ($refField) {
+                // get ref page
+                $refPages = $item->$refField;
+
+                if ($refPages) {
+
+                    // set to array if single object
+                    if (!is_array($refPages)) $refPages = array($refPages);
+
+                    if (count($refPages)) {
+                        foreach ($refPages as $refPage) {
+                            if ($refPage->id) {
+
+                                //check if ref is a pagegrid page
+                                $pgContainer = $refPage->parents('template=pg_container')->first();
+
+                                if (isset($pgContainer->id)) {
+
+                                    $itemsArray->add($refPage);
+                                    foreach ($refPage->find('') as $refChild) {
+                                        $itemsArray->add($refChild);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // END handle reference fields
+        return $itemsArray;
+    }
 
     public function renderOptions($options = null)
     {

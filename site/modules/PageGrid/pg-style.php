@@ -57,6 +57,10 @@ function renderStylesDefault($pgField)
       grid-column-start: 1;
     } ';
 
+    $defaultCss .= '.pg_image, .pg_video {
+      overflow: hidden;
+    } ';
+
   $defaultCss .= '.pg img, .pg picture, .pg video, .pg audio, .pg canvas, .pg svg, .pg figure {
       display: block;
       width: 100%;
