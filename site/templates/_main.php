@@ -39,7 +39,7 @@
 </head>
 
 
-<body id="page-body" class="frontend <?php echo $page->name; ?> <?php echo $page->template->name; ?>">
+<body class="page-body frontend <?php echo $page->name; ?> <?php echo $page->template->name; ?>">
 
     <!--  main Content -->
     <main id="content"> </main>

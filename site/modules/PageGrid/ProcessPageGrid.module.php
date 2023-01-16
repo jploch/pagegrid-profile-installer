@@ -3,7 +3,7 @@
 /**
  * PageGrid for ProcessWire
  * 
- * Copyright (C) 2022 by Jan Ploch
+ * Copyright (C) 2023 by Jan Ploch
  * THIS IS A COMMERCIAL MODULE - DO NOT DISTRIBUTE
  */
 
@@ -14,20 +14,20 @@ class ProcessPageGrid extends Process
     {
         return [
             'title' => 'PageGrid Process',
-            'summary' => 'Process Module for PageGrid',
+            'summary' => 'Process Module for FieldtypePageGrid',
             'href' => 'https://processwire.com/talk/topic/17709-how-to-create-custom-admin-pages-aka-processmodules-yes-its-that-simple/',
             'author' => 'Jan Ploch',
             'icon' => 'th',
             'requires' => array('FieldtypePageGrid'),
-            'installs' => array('FieldtypePageGrid', 'InputfieldPageGrid', 'PageGridFrontEdit'),
-            'version' => 1,
+            'installs' => array('FieldtypePageGrid', 'InputfieldPageGrid', 'PageFrontEdit', 'ProcessPageClone'),
+            'version' => '0.0.1',
 
             // page that you want created to execute this module
+            // page will be at /youradmin/setup/pagegrid/
             'page' => [
-                'name' => 'pagegrid', // your page will be online at /youradmin/setup/customadmin/
-                'parent' => 'admin',
-                'title' => 'PageGrid Process',
-                'status' => 'hidden'
+                'name' => 'pagegrid',
+                'parent' => 'setup',
+                'title' => 'PAGEGRID',
             ],
 
             'permission' => 'pagegrid-process',
@@ -43,13 +43,20 @@ class ProcessPageGrid extends Process
         $this->log->save("pagegrid", "processing ajax...");
 
         if (!$this->config->ajax) {
-            $this->error("error non ajax!");
+            // $this->error("error non ajax!");
 
-            $this->log->save("pagegrid", "error non ajax!");
+            // // bd('Redirect to PAGEGRID settings');
+            // $moduleSettingsLink = $this->modules->getModuleEditUrl('FieldtypePageGrid', true);
+            $moduleSettingsLink = $this->config->urls->admin . 'module/edit?name=FieldtypePageGrid&collapse_info=1';
+            $this->session->redirect($moduleSettingsLink, true);
+
+            // // bd($moduleSettingsLink);
+
             return ("Request must be via AJAX");
         }
 
         $pageId = isset($_POST['pageId']) ? $this->sanitizer->int($_POST['pageId']) : '';
+        $insertAfter = isset($_POST['insertAfter']) ? $this->sanitizer->int($_POST['insertAfter']) : '';
         $parentId = isset($_POST['parentId']) ? $this->sanitizer->int($_POST['parentId']) : '';
         $templateId = isset($_POST['templateId']) ? $this->sanitizer->text($_POST['templateId']) : '';
         $pgField = isset($_POST['pgField']) ? $this->sanitizer->text($_POST['pgField']) : '';
@@ -73,7 +80,7 @@ class ProcessPageGrid extends Process
             }
 
             if ($data == 1) {
-                // bd('totalLock');
+                // // // bd('totalLock');
                 $settingsPage->addStatus(Page::statusLocked);
             } else {
                 $settingsPage->removeStatus(Page::statusLocked);
@@ -105,12 +112,12 @@ class ProcessPageGrid extends Process
                 $parentID = $settingsPage->id;
                 $settingsPage = $this->pages->findOne("name=$className, template=pg_container, include=all, has_parent=$parentID");
 
-                // bd($settingsPage->name);
+                // // // bd($settingsPage->name);
 
                 if ($settingsPage->id) {
-                    // bd('class exists');
+                    // // // bd('class exists');
                 } else {
-                    // bd('create new class');
+                    // // // bd('create new class');
                     $settingsPage = new Page(); // create new page object
                     $settingsPage->template = 'pg_container'; // set template
                     $settingsPage->parent = 'pg-classes'; // set the parent
@@ -131,20 +138,41 @@ class ProcessPageGrid extends Process
 
             //save data to page meta
             $settingsPage->meta()->set('pg_styles', $dataArray);
-            $settingsPage->meta()->set('pg_field', $pgField);
+            // $settingsPage->meta()->set('pg_field', $pgField);
             $settingsPage->meta()->set('pg_page', $mainPageId);
 
-            // bd($settingsPage);
+            // // // bd($settingsPage);
 
-            // bd('save:');
-            // bd($settingsPage->meta()->pg_styles);
+            // // // bd('save:');
+            // // // bd($settingsPage->meta()->pg_styles);
         }
         // END save item settings
+
+        //bind data
+        if ($type === 'bind' && !empty($_POST['pageId'])) {
+            $data = json_decode($data, true);
+            // // bd('bind: ' . $data);
+            $p = $this->pages->get($_POST['pageId']);
+            if ($p->id) {
+                $p->meta()->set('pg_bind', $data);
+                $items = $this->pages->find("name=$p->name, include=all");
+                foreach ($items as $item) {
+                    $item->meta()->set('pg_bind', $data);
+                    if ($data == 1) {
+                        // // bd('puplish');
+                        $item->removeStatus(Page::statusUnpublished);
+                        $item->save();
+                    }
+                }
+            }
+            return;
+        }
+        //END bind data
 
         // change parent
         if (!empty($_POST['newParent'])) {
 
-            // bd('parent change');
+            // // // bd('parent change');
 
             $p = $this->pages->get($_POST['pageId']);
             $newParent = $this->pages->get($_POST['newParent']);
@@ -177,42 +205,72 @@ class ProcessPageGrid extends Process
 
         if ($type === 'delete' && !empty($removeId)) {
             $p = $this->pages->get($removeId);
+            $p->removeStatus(Page::statusLocked);
+            $p->save();
+
+            foreach ($p->find('') as $item) {
+                $item->removeStatus(Page::statusLocked);
+                $item->save();
+            }
+
             $p->trash();
             $this->log->save("pagegrid", "page removed: " . $removeId);
             return;
         }
 
+        if ($type === 'getData') {
+            //already JSON encoded
+            $globalPageData = $this->modules->get('InputfieldPageGrid')->getData();
+            return ($globalPageData);
+        }
+
         if ($type === 'clone' && !empty($_POST['pageId'])) {
 
-            $markupHeader = '';
+            if ($pageId == 0 || $pageId == '0') {
+                return false;
+            }
 
             $p = $this->pages->get($pageId);
+            $insertAfter = $this->pages->get($insertAfter);
             $newPages = array();
             $clone = $this->pages->clone($p);
+
+            //insert after different item than clone if copy to another page
+            if ($insertAfter->id) {
+
+                if ($insertAfter->template->name == 'pg_container') {
+                    $clone->parent = $insertAfter;
+                    $clone->save();
+                } else {
+                    $this->pages->insertAfter($clone, $insertAfter);
+                }
+            }
 
             $templateName = str_replace('_', '-', $p->template->name);
             $clone->setAndSave('name', $templateName . '-' . $clone->id);
             $clone->setAndSave('title', $templateName . '-' . $clone->id);
-            $newPages[$p->name] = $clone->name;
 
-            //add header and css for clone
-            $markupHeader = $this->modules->get('InputfieldPageGrid')->renderHeader($clone);
+            // $newPages array to keep a refernce to old pages
+            $newPages[$p->id] = $clone->id;
+
+            //add css for clone
             $css = $this->modules->get('InputfieldPageGrid')->renderStyles($clone);
 
-            // rename children, for unique ID and add child header
+            //set page id as meta for children to load data from original via $newPages
+            foreach ($p->find('') as $pChild) {
+                $pChild->meta()->set('old_id', $pChild->id);
+            }
+
+            // rename children, for unique ID
             foreach ($clone->find('') as $cloneChild) {
-                $oldName = $cloneChild->name;
                 $templateName = str_replace('_', '-', $cloneChild->template->name);
                 $cloneChild->setAndSave('name', $templateName . '-' . $cloneChild->id);
                 $cloneChild->setAndSave('title', $templateName . '-' . $cloneChild->id);
-                $newPages[$oldName] = $cloneChild->name;
-                $markupHeader .= $this->modules->get('InputfieldPageGrid')->renderHeader($cloneChild);
+                $newPages[$cloneChild->meta('old_id')] = $cloneChild->id;
                 $css .= $this->modules->get('InputfieldPageGrid')->renderStyles($cloneChild);
             }
 
-
             $response = array(
-                'markupHeader' => $markupHeader,
                 'markup' => $this->modules->get('InputfieldPageGrid')->renderItem($clone),
                 'css' => $css,
                 'newPages' => $newPages
@@ -230,7 +288,7 @@ class ProcessPageGrid extends Process
             $template =  $this->templates->get($templateId);
             $parent = $this->pages->get($parentId);
 
-            // bd($parent);
+            // // // bd($parent);
 
             $p->template = $template->name;
             $p->parent = $parent;
@@ -253,15 +311,16 @@ class ProcessPageGrid extends Process
             $p->setAndSave('name', $templateName . '-' . $p->id);
 
             // prefil inline fields with dummy content
-            $PageFrontEditData = wire('modules')->getConfig('PageGridFrontEdit');
-            $placeholder = $this->sanitizer->text($PageFrontEditData['placeholderText']);
+            $PageFrontEditData = wire('modules')->getConfig('PageFrontEdit');
+            $FieldtypePageGridData = wire('modules')->getConfig('FieldtypePageGrid');
+            $placeholder = $FieldtypePageGridData['placeholderText'];
 
             if (isset($PageFrontEditData['inlineEditFields'])) {
                 $PageFrontEditFields = $PageFrontEditData['inlineEditFields'];
                 foreach ($PageFrontEditFields as $fieldId) {
                     $field = wire('fields')->get($fieldId);
                     if ($p->template->hasField($field)) {
-                        if ($field->inputfieldClass == 'InputfieldCKEditor') {
+                        if ($field->inputfieldClass == 'InputfieldCKEditor' || $field->inputfieldClass == 'InputfieldTinyMCE') {
                             $p->setAndSave($field->name, '<p>' . $placeholder . '</p>');
                         } else {
                             $p->setAndSave($field->name, $placeholder);
@@ -271,20 +330,25 @@ class ProcessPageGrid extends Process
             }
             //END prefil inline fields with dummy content
 
-
             $response = array(
                 'newPageClass' =>  $p->title,
-                'markupHeader' =>  $this->modules->get('InputfieldPageGrid')->renderHeader($p),
                 'markup' => $this->modules->get('InputfieldPageGrid')->renderItem($p)
             );
 
             return (json_encode($response));
         }
 
-        // handel uploads
+        // handel uploads to pages
         if ($type === 'upload' && !empty($pageId)) {
 
             $p = $this->pages->get($pageId);
+            $fileRelativePath = $p->filesUrl();
+            $extensions = 'jpg jpeg gif png svg';
+            $fileField = 0;
+
+            if (!($p->id)) {
+                return;
+            }
 
             if ($p->hasField($field_name)) {
                 $fileField = $p->$field_name;
@@ -293,38 +357,41 @@ class ProcessPageGrid extends Process
             if ($fileField) {
                 $fileField->deleteAll();
                 $filePath = (string) $fileField->path();
-            }
-
-            if (!($fileField)) {
+                $f = $this->fields->get($field_name);
+                $extensions = $f->extensions ? $f->extensions : '';
+            } else {
                 // add custom path
-                $filePage = $this->pages->get($pageId);
-                $filePath = $filePage->filesManager->path;
-                $fileRelativePath = $filePage->filesUrl();
+                $filePath = $p->filesManager->path;
             }
 
+            $extensionArray = explode(" ", $extensions);
             $u = new WireUpload('preview_name');
             $u->setMaxFiles(1);
             $u->setOverwrite(false);
             //            $filePath = ( string ) $fileField->path();
             $u->setDestinationPath($filePath);
+            $u->setValidExtensions($extensionArray);
 
-            $u->setValidExtensions(array('jpg', 'jpeg', 'gif', 'png', 'svg', 'mp4'));
+            // execute upload and check for errors
+            $filename = $u->execute();
+
+            //check if upload has errors and is correct file type
+            if (!count($filename)) {
+                header('HTTP/1.1 500 Internal Server Booboo');
+                header('Content-Type: application/json; charset=UTF-8');
+                die('Sorry, this file type is not supported! Upload one of these files: ' . $extensions);
+                // return false;
+            }
+
             foreach ($u->execute() as $filename) {
-
                 if ($fileField) {
                     $fileField->add($filename);
-                } else {
-                    if (move_uploaded_file($filename, $filePath)) {
-                        return $fileRelativePath . $filename;
-                    } else {
-                        return $fileRelativePath . $filename;
-                    }
                 }
             }
 
             $this->log->save("pagegrid", $filePath);
-
             $p->save();
+            return $fileRelativePath . $filename;
         }
         //excude end
     }
@@ -341,7 +408,7 @@ class ProcessPageGrid extends Process
 
         if (count($_POST)) {
 
-            // bd($_POST);
+            // // // bd($_POST);
 
             $this->pageId = (int) $this->input->post("id");
             $this->pageContext = $this->pages->get($this->pageId);
@@ -380,21 +447,17 @@ class ProcessPageGrid extends Process
                     $p = $parent;
                 }
 
-                $headerToRender = $p->find('');
-                $renderMarkup = $this->modules->get('InputfieldPageGrid')->renderHeader($p);
-
-                foreach ($headerToRender as $item) {
-                    $renderMarkup .= $this->modules->get('InputfieldPageGrid')->renderHeader($item);
-                };
+                $p->meta()->set('pg_ajax', true);
 
                 $response = array(
                     'newPageClass' =>  $p->name,
-                    'markupHeader' =>  $renderMarkup,
                     'markup' => $this->modules->get('InputfieldPageGrid')->renderItem($p),
                     'message' => $message
                 );
 
-                // bd($response);
+                $p->meta()->set('pg_ajax', false);
+
+                // // // bd($response);
 
                 return (json_encode($response));
             }

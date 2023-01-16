@@ -34,12 +34,14 @@ if(!defined("PROCESSWIRE")) die();
  * @var bool
  *
  */
-$config->debug = false;
+$config->debug = true;
 
 $config->useFunctionsAPI = true;
 $config->useMarkupRegions = true;
 $config->templateCompile = false;
 $config->moduleInstall('download', true);
+$config->tableSalt = '4382703cd67381aeac74e7d9ce13a709f72e86a0'; 
+$config->defaultAdminTheme = 'AdminThemeUikit';
 
 
 /*** INSTALLER CONFIG ********************************************************************/

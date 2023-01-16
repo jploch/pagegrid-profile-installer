@@ -6,7 +6,6 @@
  */
 @import "variables.less";
 @import "components/_index.less";
-
 /**********************************************************************
  * Styles
  *
@@ -252,11 +251,6 @@ body .ui-front {
 
 // END PAGELIST Tree
 
-.InputfieldIsSecondary > .InputfieldContent,
-.InputfieldIsSecondary > .InputfieldHeader {
-    background: none;
-}
-
 //adminColumns Break 
 html.adminColumns .gutter {
     //  width: 1px !important;
@@ -438,6 +432,7 @@ body > ul.pw-dropdown-menu.page ul.ui-menu[style*="left"] ul,
 .pw-dropdown-menu.ui-menu.page li a {
     width: 200px;
     overflow: hidden;
+    text-overflow: ellipsis; 
 }
 
 .pw ul.pw-dropdown-menu.ui-menu li:last-of-type > a,
