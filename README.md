@@ -1,8 +1,5 @@
 [<img src="https://page-grid.com/github-assets/pagegrid-logo.png" width="300" />](https://page-grid.com)
 
-[![Release](https://badgen.net/github/release/FieldtypePageGrid/stable?color=yellow)](https://github.com/FieldtypePageGrid/releases/latest)
-[![Downloads](https://badgen.net/packagist/dt/FieldtypePageGrid/cms?color=red)](https://github.com/FieldtypePageGrid/releases/latest)
-
 ### PAGEGRID is a friendly pagebuilder for ProcessWire, a flexible CMS with a powerful and simple API that is a joy to use. 
 
 <img src="https://page-grid.com/github-assets/pagegrid-screen.png" />
