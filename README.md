@@ -7,8 +7,13 @@
 ### Try PAGEGRID for free  
 PAGEGRID is not free software. However, you can try PAGEGRID and the site profile on your local machine or on a test server as long as you need to make sure it is the right tool for your next project. … and when you’re convinced, [buy your license](https://page-grid.com/buy).
 
+The theme/profile comes with everything you need to quickly get your website up and running. It includes the newest version of ProcessWire as well as some additional modules we find helpful. 
+
+Alternatively you can just install the module into an existing ProcessWire project. It's everything you need to run PAGEGRID.
+
 ### Installation
-[PAGEGRID site profile install guide](http://pgrid-website.test/docs/#/installation)
+[Site profile install guide](http://pgrid-website.test/docs/#/installation)
+[Module install guide](http://pgrid-website.test/docs/#/developer/installation)
 
 ### Contribute
 
