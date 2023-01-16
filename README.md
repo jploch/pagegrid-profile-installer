@@ -7,9 +7,6 @@
 ### Try PAGEGRID for free  
 PAGEGRID is not free software. However, you can try PAGEGRID and the site profile on your local machine or on a test server as long as you need to make sure it is the right tool for your next project. … and when you’re convinced, [buy your license](https://page-grid.com/buy).
 
-### Requirements
-Process Wire 3.0.210 or greater. [Download ProcessWire](https://processwire.com/download/core/). 
-
 ### Installation
 [PAGEGRID site profile install guide](http://pgrid-website.test/docs/#/installation)
 
@@ -19,7 +16,7 @@ Process Wire 3.0.210 or greater. [Download ProcessWire](https://processwire.com/
 Please post all bug reports in our [issue tracker](https://github.com/FieldtypePageGrid/issues).
 
 **Suggest a feature**  
-If you have ideas for a feature or enhancement for PAGEGRID, please make a post on the PAGEGRID forum at [feedback platform](https://processwire.com/talk/forum/64-pagegrid/).
+If you have ideas for a feature or enhancement for PAGEGRID, please make a post on the [PAGEGRID forum](https://processwire.com/talk/forum/64-pagegrid/).
 
 ## What's PAGEGRID?
 - **[page-grid.com](https://page-grid.com)** – Get to know PAGEGRID.
