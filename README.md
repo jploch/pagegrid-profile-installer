@@ -1,7 +1,7 @@
 [<img src="https://page-grid.com/github-assets/pagegrid-logo-theme.png" width="300" />](https://page-grid.com)
 
 ### PAGEGRID is a friendly pagebuilder for ProcessWire, a flexible CMS with a powerful and simple API. 
-The site profile comes with everything you need to quickly get your website up and running. It includes the newest version of ProcessWire as well as some additional modules we find helpful. Alternatively you can just install the module into an existing ProcessWire project. It's everything you need to run PAGEGRID.
+The theme/profile comes with everything you need to quickly get your website up and running. It includes the newest version of ProcessWire as well as some additional modules we find helpful. Alternatively you can just install the module into an existing ProcessWire project. It's everything you need to run PAGEGRID.
 
 <img src="https://page-grid.com/github-assets/pagegrid-screen.png" />
 
