@@ -12,8 +12,8 @@ The theme/profile comes with everything you need to quickly get your website up 
 Alternatively you can just install the module into an existing ProcessWire project. It's everything you need to run PAGEGRID.
 
 ### Installation
-[Site profile install guide](http://pgrid-website.test/docs/#/installation)
-[Module install guide](http://pgrid-website.test/docs/#/developer/installation)
+- [Site profile install guide](http://pgrid-website.test/docs/#/installation)
+- [Module install guide](http://pgrid-website.test/docs/#/developer/installation)
 
 ### Contribute
 
