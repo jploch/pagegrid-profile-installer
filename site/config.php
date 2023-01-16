@@ -35,6 +35,7 @@ if(!defined("PROCESSWIRE")) die();
  *
  */
 $config->debug = true;
+$config->moduleInstall('directory', true);
 
 $config->useFunctionsAPI = true;
 $config->useMarkupRegions = true;
