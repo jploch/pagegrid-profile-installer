@@ -1,6 +1,6 @@
 [<img src="https://page-grid.com/github-assets/pagegrid-logo.png" width="300" />](https://page-grid.com)
 
-### PAGEGRID is a friendly pagebuilder for ProcessWire, a flexible CMS with a powerful and simple API that is a joy to use. 
+### PAGEGRID is a friendly pagebuilder for ProcessWire, a flexible CMS with a powerful and simple API. 
 
 <img src="https://page-grid.com/github-assets/pagegrid-screen.png" />
 
