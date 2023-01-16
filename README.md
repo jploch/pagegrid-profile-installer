@@ -11,17 +11,7 @@ PAGEGRID is not free software. However, you can try PAGEGRID and the site profil
 Process Wire 3.0.210 or greater. [Download ProcessWire](https://processwire.com/download/core/). 
 
 ### Installation
-1. Go to “Modules > Site > Add New“
-2. Paste the Module Class Name “FieldtypePageGrid“ into the field “Add Module From Directory“
-3. Click “Download And Install“
-4. On the overview, click “Download And Install“ again…
-5. On the following screen, click “Install Now“
-
-### Manually
-1. Download the module files from GitHub
-2. Copy all of the files for this module into /site/modules/PageGrid/
-3. Go to “Modules > Refresh” in your admin
-4. Click “Install“ on the “FieldtypePageGrid“ Module
+[PAGEGRID site profile install guide](http://pgrid-website.test/docs/#/installation)
 
 ### Contribute
 
