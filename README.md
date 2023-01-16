@@ -5,7 +5,7 @@
 <img src="https://page-grid.com/github-assets/pagegrid-screen.png" />
 
 ### Try PAGEGRID for free  
-PAGEGRID is not free software. However, you can try PAGEGRID and the Starterkit on your local machine or on a test server as long as you need to make sure it is the right tool for your next project. … and when you’re convinced, [buy your license](https://page-grid.com/buy).
+PAGEGRID is not free software. However, you can try PAGEGRID and the site profile on your local machine or on a test server as long as you need to make sure it is the right tool for your next project. … and when you’re convinced, [buy your license](https://page-grid.com/buy).
 
 ### Requirements
 Process Wire 3.0.210 or greater. [Download ProcessWire](https://processwire.com/download/core/). 
