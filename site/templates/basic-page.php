@@ -1,13 +1,14 @@
 <?php namespace ProcessWire;
 
-//redirect only in frontend
-if ( $page->name == 'home' && !$page->homepage && !$pagegrid->isBackend() ) {
-    $session->redirect( '/' );
-}
-
 //if profile is installed module might not be loaded, so force refresh modules
 if (!$modules->isInstalled('InputfieldPageGrid')) {
     $modules->refresh();
+    $pagegrid = $modules->get('InputfieldPageGrid');
+}
+
+//redirect only in frontend
+if ($page->name == 'home' && !$page->homepage && !$pagegrid->isBackend()) {
+    $session->redirect('/');
 }
 
 ?>
@@ -18,12 +19,12 @@ if (!$modules->isInstalled('InputfieldPageGrid')) {
 </pw-region>
 
 <pw-region pw-prepend="content">
-    <?= $pagegrid->renderGrid( $page ); ?>
+    <?= $pagegrid->renderGrid($page); ?>
 </pw-region>
 
 <!--template scripts auto load js files with same name as template-->
 <pw-region id="scripts">
-    <?= $pagegrid->scripts( $page ); ?>
+    <?= $pagegrid->scripts($page); ?>
 </pw-region>
 
-<?php include( "./_main.php" ); ?>
+<?php include("./_main.php"); ?>
