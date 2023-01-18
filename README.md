@@ -9,13 +9,13 @@ The theme/profile comes with everything you need to quickly get your website up 
 PAGEGRID is not free software. However, you can try PAGEGRID and the site profile on your local machine or on a test server as long as you need to make sure it is the right tool for your next project. … and when you’re convinced, [buy your license](https://page-grid.com/buy).
 
 ### Installation
-- [Site profile install guide](http://pgrid-website.test/docs/#/installation)
-- [Module install guide](http://pgrid-website.test/docs/#/developer/installation)
+- [Site profile install guide](https://page-grid.com/docs/#/installation)
+- [Module install guide](https://page-grid.com/docs/#/developer/installation)
 
 ### Contribute
 
 **Found a bug?**  
-Please post all bug reports in our [issue tracker](https://github.com/PageGrid/issues).
+Please post all bug reports in our [issue tracker](https://github.com/jploch/PageGrid/issues/).
 
 **Suggest a feature**  
 If you have ideas for a feature or enhancement for PAGEGRID, please make a post on the [PAGEGRID forum](https://processwire.com/talk/forum/64-pagegrid/).
@@ -23,7 +23,7 @@ If you have ideas for a feature or enhancement for PAGEGRID, please make a post 
 ## What's PAGEGRID?
 - **[page-grid.com](https://page-grid.com)** – Get to know PAGEGRID.
 - **[Documentation](https://page-grid.com/docs/)** – Read the official documentation.
-- **[Issues](https://github.com/jploch/PageGrid/issues)** – Report bugs and other problems.
+- **[Issues](https://github.com/jploch/PageGrid/issues/)** – Report bugs and other problems.
 - **[Forum](https://processwire.com/talk/forum/64-pagegrid/)** – Whenever you get stuck, don't hesitate to reach out for questions and support.
 
 ---
