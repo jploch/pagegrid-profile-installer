@@ -16,7 +16,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
     return array(
       'title' => __('PAGEGRID'),
       'summary' => __('Commercial page builder module that renders block templates and adds drag and drop functionality in admin.', __FILE__),
-      'version' => '0.0.92',
+      'version' => '0.0.93',
       'author' => 'Jan Ploch',
       'icon' => 'th',
       'href' => "https://page-grid.com",
@@ -564,7 +564,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
     }
 
     $post_data = array(
-      'product_id' => 'WFTD6dOx_CJ7iLdYyzYkQQ==',
+      'product_id' => '71jpQn0sTqdzpzhNPOG08g==',
       'license_key' => $lKey,
       'increment_uses_count' => ($validHost) ? 'false' : 'true'
     );
