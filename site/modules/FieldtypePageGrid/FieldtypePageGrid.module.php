@@ -16,7 +16,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
     return array(
       'title' => __('PAGEGRID'),
       'summary' => __('Commercial page builder module that renders block templates and adds drag and drop functionality in admin.', __FILE__),
-      'version' => '0.0.94',
+      'version' => '0.0.97',
       'author' => 'Jan Ploch',
       'icon' => 'th',
       'href' => "https://page-grid.com",
@@ -40,8 +40,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
 
   public function createModule() {
     $fs = wire('fields');
-    $adminPageUrl = wire('config')->url('admin');
-    $adminPage = wire('pages')->get($adminPageUrl);
+    $adminPage = wire('page')->rootParent;
 
     // create page to hold items
     $p = wire('pages')->findOne("name=pg-items, template=pg_container, include=hidden");
@@ -584,7 +583,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
 
       $variant = $array['purchase']['variants'];
       $uses = $array['uses'];
-      $valid = true;
+      $valid = 1;
 
       if (isset($variant)) {
 
@@ -602,7 +601,7 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
 
       }
     } else {
-      $valid = false;
+      $valid = 0;
     }
 
     if ($valid == 1 || $valid == 2) {
@@ -616,9 +615,9 @@ class FieldtypePageGrid extends FieldtypeMulti implements Module, ConfigurableMo
       }
     }
 
+    curl_close($curl);
     return $valid;
 
-    curl_close($curl);
   }
 
 
