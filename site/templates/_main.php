@@ -45,7 +45,6 @@
     <main id="content"> </main>
 
     <!--scripts-->
-    <script type="text/javascript" src="<?php echo $config->urls->templates?>js/main.js"></script>
     <pw-region id="scripts"></pw-region>
 
 </body>
