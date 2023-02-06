@@ -487,7 +487,9 @@ class Installer {
 		$this->input('dbHost', 'DB Host', $values['dbHost']); 
 		$this->input('dbPort', 'DB Port', $values['dbPort']);
 	
-		$this->select('dbCharset', 'DB Charset', $values['dbCharset'], array('utf8', 'utf8mb4'));
+		// $this->select('dbCharset', 'DB Charset', $values['dbCharset'], array('utf8', 'utf8mb4'));
+		//JP force utf8
+		$this->select('dbCharset', 'DB Charset', $values['dbCharset'], array('utf8'));
 		$this->select('dbEngine', 'DB Engine', $values['dbEngine'], array('MyISAM', 'InnoDB'));
 		$this->clear();
 	
