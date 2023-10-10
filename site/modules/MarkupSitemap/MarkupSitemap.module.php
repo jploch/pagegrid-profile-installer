@@ -2,43 +2,42 @@
 
 /**
  * Sitemap for ProcessWire
- *
  * Module class
  *
- * @author Mike Rockett <github@rockett.pw>
- * @copyright 2017-18
+ * @author Mike Rockett <mike@rockett.pw>
  * @license ISC
  */
 
-// Require the classloader
-require_once __DIR__ . '/ClassLoader.php';
+// Require the classloaders
+wire('classLoader')->addNamespace('Thepixeldeveloper\Sitemap', __DIR__ . '/src/Sitemap');
+wire('classLoader')->addNamespace('Rockett\Concerns', __DIR__ . '/src/Concerns');
+wire('classLoader')->addNamespace('Rockett\Support', __DIR__ . '/src/Support');
 
-use Rockett\Sitemap\Elements\Url;
-use Rockett\Sitemap\Elements\Urlset;
-use Rockett\Sitemap\Output;
-use Rockett\Sitemap\SubElements\Image;
-use Rockett\Sitemap\SubElements\Link;
-use Rockett\Traits\FieldsTrait;
+use Exception;
+use ProcessWire\Language;
+use ProcessWire\Page;
+use ProcessWire\WireException;
+use Rockett\Concerns;
+use Rockett\Support\ParseFloat;
+use Rockett\Support\ParseTimestamp;
+use Thepixeldeveloper\Sitemap\Drivers\XmlWriterDriver;
+use Thepixeldeveloper\Sitemap\Extensions\Link;
+use Thepixeldeveloper\Sitemap\Url;
+use Thepixeldeveloper\Sitemap\Urlset;
 
 class MarkupSitemap extends WireData implements Module
 {
-  use FieldsTrait;
-
-  /**
-   * Image fields: each field is mapped to the relavent
-   * function for the Image sub-element
-   */
-  const IMAGE_FIELDS = [
-    'Caption' => 'description',
-    'License' => 'license',
-    'Title' => 'title',
-    'GeoLocation' => 'geo|location|geolocation',
-  ];
+  use Concerns\DebugsThings;
+  use Concerns\BuildsInputFields;
+  use Concerns\ConfiguresTabs;
+  use Concerns\ProcessesTabs;
+  use Concerns\HandlesEvents;
+  use Concerns\SupportsImages;
 
   /**
    * Default page config array, used for comparison at save-time
    */
-  const DEFAULT_PAGE_OPTIONS = [
+  private static $defaultPageOptions = [
     'priority' => false,
     'excludes' => [
       'images' => false,
@@ -48,12 +47,39 @@ class MarkupSitemap extends WireData implements Module
   ];
 
   /**
-   * Sitemap URI
+   * Image fields: each field is mapped to the relavent
+   * function for the Image sub-element
    */
-  const SITEMAP_URI = '/sitemap.xml';
+  private static $imageFields = [
+    'Caption' => 'description',
+    'License' => 'license',
+    'Title' => 'title',
+    'GeoLocation' => 'geo|location|geolocation',
+  ];
+
+  /**
+   * Sitemap URI
+   *
+   * @var string
+   */
+  const sitemapUri = '/sitemap.xml';
+
+  /**
+   * The name of the additional pages hook
+   *
+   * @var string
+   */
+  const getAdditionalPages = 'MarkupSitemap::getAdditionalPages';
+
+  /**
+   * Determine whether language support hooks have been added.
+   * @var bool
+   */
+  private static $languageSupportHooksApplied;
 
   /**
    * Current request URI
+   *
    * @var string
    */
   protected $requestUri = '';
@@ -66,16 +92,22 @@ class MarkupSitemap extends WireData implements Module
   protected $urlSet;
 
   /**
+   * The path of the sitemap cache
+   *
+   * @var string
+   */
+  private $cachePath;
+
+  /**
    * Module installer
-   * Requires ProcessWire 2.8.16+/3.0.16+ (saveConfig; getConfig)
+   * Requires ProcessWire 3.0.16+
+   *
    * @throws WireException
    */
   public function ___install()
   {
-    $processWireVersion = $this->config->version;
-    $applicableMajorMinor = ProcessWire::versionMajor === 2 ? '2.8' : '3.0';
-    if (version_compare($processWireVersion, "{$applicableMajorMinor}.16") < 0) {
-      throw new WireException("Requires ProcessWire {$applicableMajorMinor}.16+ to run.");
+    if (version_compare($this->config->version, '3.0.16') < 0) {
+      throw new WireException('Requires ProcessWire 3.0.16+ to run.');
     }
   }
 
@@ -85,48 +117,15 @@ class MarkupSitemap extends WireData implements Module
    */
   public function __construct()
   {
-    // Set the request URI
     $this->requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : null;
-  }
-
-  /**
-   * Commit page sitemap options to module config
-   * when page is saved. This is a centralised storage method
-   * for all page sitemap options.
-   * @param array $options
-   */
-  public function commitPageSitemapOptions($pageId, $options)
-  {
-    // Save the options for this page. Previous
-    // config is completely discarded.
-    return $this->modules->saveConfig($this, "o{$pageId}", [
-      'priority' => $options['priority'],
-      'excludes' => $options['excludes'],
-    ]);
-  }
-
-  /**
-   * When a page is deleted (note: not trashed), then its
-   * sitemap options also need to be deleted. We don't do this
-   * when its trashed, just in case the page is restored later.
-   * @param  HookEvent $event
-   * @return void
-   */
-  public function deletePageSitemapOptions(HookEvent $event)
-  {
-    // Get the ID of the page that was deleted
-    $pageId = $event->arguments(0)->id;
-
-    // By saving a null value by omission, we're effectively deleting
-    // the sitemap options for the deleted page.
-
-    return $this->modules->saveConfig($this, "o{$pageId}");
+    $this->cachePath = $this->config->paths->cache . 'MarkupCache/MarkupSitemap';
   }
 
   /**
    * Return a POSTed value or its default if not available
-   * @var    string  $valueKey
-   * @var    mixed   $default
+   *
+   * @var string $valueKey
+   * @var mixed $default
    * @return mixed
    */
   public function getPostedValue($valueKey, $default = false)
@@ -135,26 +134,22 @@ class MarkupSitemap extends WireData implements Module
   }
 
   /**
-   * Initiate the module
+   * Initialize the module
    *
    * @return void
    */
-  public function init()
+  public function init(): void
   {
     // If the request is valid (/sitemap.xml)...
     if ($this->isValidRequest()) {
       // Add the relevant page hooks for multi-language support
       // as these are not bootstrapped at the 404 event (for some reason...)
       if ($this->siteUsesLanguageSupportPageNames()) {
-        foreach (['localHttpUrl', 'localName'] as $pageHook) {
-          $pageHookFunction = 'hookPage' . ucfirst($pageHook);
-          $this->addHook("Page::{$pageHook}", null, function ($event) use ($pageHookFunction) {
-            $this->modules->LanguageSupportPageNames->{$pageHookFunction}($event);
-          });
-        }
+        static::applyLanguageSupportHooks();
       }
+
       // Add the hook to process and render the sitemap.
-      $this->addHookBefore('ProcessPageView::pageNotFound', $this, 'render');
+      $this->addHookAfter('ProcessPageView::pageNotFound', $this, 'render');
     }
 
     // Add hook to render Sitemap fields on the Settings tab of each page
@@ -162,6 +157,7 @@ class MarkupSitemap extends WireData implements Module
       $this->addHookAfter('ProcessPageEdit::buildFormSettings', $this, 'setupSettingsTab');
       $this->addHookAfter('ProcessPageEdit::processInput', $this, 'processSettingsTab');
     }
+
     // If the user can delete pages, then we need to hook into delete
     // events to remove sitemap options for deleted pages
     if ($this->user->hasPermission('page-delete')) {
@@ -170,61 +166,37 @@ class MarkupSitemap extends WireData implements Module
   }
 
   /**
-   * Process Sitemap fields from Settings tab
-   * @param  HookEvent $event
+   * Add the relevant page hooks for multi-language support
+   *
    * @return void
    */
-  public function processSettingsTab(HookEvent $event)
+  public static function applyLanguageSupportHooks(): void
   {
-    // Prevent recursion
-    if (($level = $event->arguments(1)) > 0) {
-      return;
-    }
+    if (!static::$languageSupportHooksApplied) {
+      foreach (['localUrl', 'localHttpUrl', 'localName'] as $pageHook) {
+        $pageHookFunction = 'hookPage' . ucfirst($pageHook);
+        wire()->addHook("Page::{$pageHook}", null, function ($event) use ($pageHookFunction) {
+          wire('modules')->LanguageSupportPageNames->{$pageHookFunction}($event);
+        });
+      }
 
-    // Get the current page and stop if we're working
-    // with an admin or trashed page.
-    $page = $event->object->getPage();
-    if ($page->matches("has_parent={$this->config->adminRootPageID}|{$this->config->trashPageID}")) {
-      return;
-    }
-
-    // Build the options instance for this page.
-    // If saving the home page, excludes.page and excludes.children
-    // are saved as false. The data is kept for the purposes
-    // of code simplification, and has no effect on
-    // how things work.
-    $pageSitemapPageOptions = [
-      'priority' => $this->getPostedValue('sitemap_priority'),
-      'excludes' => [
-        'images' => $this->getPostedValue('sitemap_exclude_images'),
-        'page' => $this->getPostedValue('sitemap_exclude_page'),
-        'children' => $this->getPostedValue('sitemap_exclude_children'),
-      ],
-    ];
-
-    $existingOptions = $this->modules->getConfig($this, "o{$page->id}");
-
-    if ($existingOptions === null && $pageSitemapPageOptions === self::DEFAULT_PAGE_OPTIONS) {
-      return;
-    }
-
-    // Save options for this page
-    if (!$this->commitPageSitemapOptions($page->id, $pageSitemapPageOptions)) {
-      $this->error($this->_('Something went wrong, and the sitemap options for this page could not be saved.'));
+      static::$languageSupportHooksApplied = true;
     }
   }
 
   /**
-   * Initiate the sitemap render by getting the root URI (giving
+   * Initialize the sitemap render by getting the root URI (giving
    * consideration to multi-site setups) and passing it to the
    * first/parent recursive render-method (addPages).
    *
-   * MarkupCache is used to cache the entire sitemap, and the cache
-   * is destroyed when settings are saved and, if set up, a page is saved.
+   * Depending on config settings entire sitemap is cached using MarkupCache or
+   * WireCache, and the cache is destroyed when settings are saved and, if set
+   * up, a page is saved.
    *
    * @param HookEvent $event
+   * @return void
    */
-  public function render(HookEvent $event)
+  public function render(HookEvent $event): void
   {
     // Get the initial root URI.
     $rootPage = $this->getRootPageUri();
@@ -239,127 +211,107 @@ class MarkupSitemap extends WireData implements Module
 
     // Make sure that the root page exists.
     if (!$this->pages->get($rootPage) instanceof NullPage) {
-      // Check for cached sitemap or regenerate if it doesn't exist
-      $markupCache = $this->modules->MarkupCache;
-
-      if ((!$output = $markupCache->get('MarkupSitemap', 3600)) || $this->config->debug) {
-        $output = $this->buildNewSitemap($rootPage);
-        $markupCache->save($output);
-        header('X-Cached-Sitemap: no');
-      } else {
-        header('X-Cached-Sitemap: yes');
-      }
-
+      $event->return = $this->getSitemap($rootPage);
       header('Content-Type: application/xml', true, 200);
 
-      $event->return = $output;
-
-      // Prevent further hooks. This stops
-      // SystemNotifications from displaying a 404 event
-      // when /sitemap.xml is requested. Additionally,
-      // it prevents further modification to the sitemap.
+      // Prevent further hooks. This stops SystemNotifications from
+      // displaying a 404 event when /sitemap.xml is requested.
+      // Additionally, it prevents further modification to the sitemap.
       $event->replace = true;
       $event->cancelHooks = true;
     }
   }
 
   /**
-   * Add sitemap fields to the Settings tab.
-   * Responds to ProcessPageEdit::buildFormSettings hook
-   * @param  HookEvent $event
-   * @return void
+   * Remove the sitemap cache.
+   *
+   * @return bool
    */
-  public function setupSettingsTab(HookEvent $event)
+  public function removeSitemapCache(): bool
   {
-    // Get the current page
-    $page = $event->object->getPage();
+    // Cache settings
+    $cacheKey = 'MarkupSitemap';
+    $cacheMethod = $this->cache_method ?: 'MarkupCache';
+    $removed = false;
 
-    // We only need to proceed with this process if the current page's
-    // template has been assigned as configurable in the module's configuration.
-    if ($this->sitemap_include_templates !== null
-      && in_array($page->template->name, $this->sitemap_include_templates)
-      && !in_array($page->template->name, $this->sitemap_exclude_templates)
-    ) {
-      // Get the settings tab inputfields
-      $inputFields = $event->return;
+    // Attempt to fetch sitemap from cache
+    $cache = $cacheMethod == 'WireCache'
+      ? $this->cache
+      : $this->modules->MarkupCache;
 
-      // Get the saved options for this page
-      $pageOptions = $this->modules->getConfig($this, "o{$page->id}");
+    $isCached = !!$cache->get($cacheKey);
 
-      // Sitemap fieldset
-      $sitemapFieldset = $this->buildInputField('Fieldset', [
-        'label' => 'Sitemap',
-        'icon' => 'sitemap',
-        'collapsed' => Inputfield::collapsedBlank,
-      ]);
-
-      // Add priority field
-      $sitemapFieldset->append($this->buildInputField('Text', [
-        'name' => 'sitemap_priority',
-        'label' => $this->_('Page Priority'),
-        'description' => $this->_('Set this page’s priority on a scale of 0.0 to 1.0.'),
-        'notes' => $this->_('This field is optional, and the priority will only be included if it is set here.'),
-        'columnWidth' => '50%',
-        'pattern' => "(0(\.\d+)?|1(\.0+)?)",
-        'value' => $pageOptions['priority'],
-      ]));
-
-      // Add exclude_images field
-      $sitemapFieldset->append($this->buildInputField('Checkbox', [
-        'name' => 'sitemap_exclude_images',
-        'label' => $this->_('Exclude Images'),
-        'label2' => $this->_('Do not add images to the sitemap for this page’s entry'),
-        'description' => $this->_('By default, all image fields for this page will be included in the sitemap. If you don’t want this to happen, you can exclude such inclusion for this page by checking the box below.'),
-        'columnWidth' => '50%',
-        'autocheck' => true,
-        'value' => $pageOptions['excludes']['images'],
-      ]));
-
-      // These fields may only be added to non-root pages.
-      if ($page->id !== 1) {
-        // Add exclude_page field
-        $sitemapFieldset->append($this->buildInputField('Checkbox', [
-          'name' => 'sitemap_exclude_page',
-          'label' => $this->_('Exclude Page'),
-          'label2' => $this->_('Do not include this page in the sitemap'),
-          'description' => $this->_('If you’d like to skip the inclusion of this page (not considering its children, if any) from the sitemap, you can check the box below.'),
-          'columnWidth' => '50%',
-          'autocheck' => true,
-          'value' => $pageOptions['excludes']['page'],
-        ]));
-
-        // Add exclude_children field
-        $sitemapFieldset->append($this->buildInputField('Checkbox', [
-          'name' => 'sitemap_exclude_children',
-          'label' => $this->_('Exclude Children'),
-          'label2' => $this->_('Do not include this page’s children (if any) in sitemap.xml'),
-          'description' => $this->_('If you’d like to skip the inclusion of this page’s children (if any, and not considering the page itself) from the sitemap, you can check the box below.'),
-          'columnWidth' => '50%',
-          'autocheck' => true,
-          'value' => $pageOptions['excludes']['children'],
-        ]));
-      }
-
-      // Add the new fieldset to the Settings tab (fieldset)
-      $inputFields->insertBefore($sitemapFieldset, $inputFields->find('name=status')->first());
+    // If the cache exists and is WireCache, destroy it
+    if ($isCached && $cacheMethod === 'WireCache') {
+      $removed = (bool) $cache->deleteFor($cacheKey);
     }
+
+    // If the cache exists and is MarkupCache, destroy it
+    if ($isCached && $cacheMethod === 'MarkupCache') {
+      try {
+        $removed = (bool) CacheFile::removeAll($this->cachePath, true);
+      } catch (Exception $e) {
+        $removed = false;
+      }
+    }
+
+    return $removed;
   }
 
   /**
-   * Correctly format the priority float to one decimal
-   * @param  float
+   * Get sitemap markup, cached or fresh.
+   *
+   * @param string $rootPage
    * @return string
    */
-  protected function formatPriorityFloat($priority)
+  protected function getSitemap(string $rootPage): string
   {
-    return sprintf('%.1F', (float) $priority);
+    // Bail out early if debug mode is enabled, or if the
+    // cache rules require a fresh Sitemap for this request.
+    if ($this->requiresFreshSitemap()) {
+      $sitemap = $this->buildNewSitemap($rootPage);
+      return $sitemap;
+    }
+
+    // Cache settings
+    $cacheTtl = $this->cache_ttl ?: 3600;
+    $cacheKey = 'MarkupSitemap';
+    $cacheMethod = $this->cache_method ?: 'MarkupCache';
+
+    // Attempt to fetch sitemap from cache
+    $cache = $cacheMethod == 'WireCache'
+      ? $this->cache
+      : $this->modules->MarkupCache;
+
+    $output = $cache->get($cacheKey, $cacheTtl);
+
+    // If output is empty, generate and cache new sitemap
+    if (empty($output)) {
+      $sitemap = $this->buildNewSitemap($rootPage);
+      header('X-Cached-Sitemap: no, next-request');
+
+      $output = $sitemap;
+
+      if ($cacheMethod == 'WireCache') {
+        $cache->save($cacheKey, $output, $cacheTtl);
+      } else {
+        $cache->save($output);
+      }
+
+      return $output;
+    }
+
+    header('X-Cached-Sitemap: yes');
+
+    return $output;
   }
 
   /**
    * Get the root page URI
+   *
    * @return string
    */
-  protected function getRootPageUri()
+  protected function getRootPageUri(): string
   {
     return (string) str_ireplace(
       trim($this->config->urls->root, '/'),
@@ -370,121 +322,113 @@ class MarkupSitemap extends WireData implements Module
 
   /**
    * Determine if the request is valud
+   *
    * @return boolean
    */
-  protected function isValidRequest()
+  protected function isValidRequest(): bool
   {
-    $valid = (bool) (
-      $this->requestUri !== null &&
-      strlen($this->requestUri) - strlen(self::SITEMAP_URI) === strrpos($this->requestUri, self::SITEMAP_URI)
+    $valid = (bool) ($this->requestUri !== null &&
+      strlen($this->requestUri) - strlen(self::sitemapUri) === strrpos($this->requestUri, self::sitemapUri)
     );
 
     return $valid;
   }
 
   /**
+   * Determines whether or not a fresh sitemap is required
+   * for the current request. A few factors are considered,
+   * such as debug mode, the cache method, and the update policy.
+   *
+   * @return boolean
+   */
+  protected function requiresFreshSitemap(): bool
+  {
+    if ($this->config->debug) {
+      header('X-Cached-Sitemap: no, debug');
+      return true;
+    }
+
+    if ($this->cache_method === 'None') {
+      header('X-Cached-Sitemap: no, disabled');
+      return true;
+    }
+
+    if ($this->cache_policy === 'guest' && !$this->user->isGuest()) {
+      header('X-Cached-Sitemap: no, guest-policy');
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Check if the language is not default and that the
    * page is not available/statused in the default language.
-   * @param  string $language
-   * @param  Page   $page
+   *
+   * @param Language $language
+   * @param Page $page
    * @return bool
    */
-  protected function pageLanguageInvalid($language, $page)
+  protected function pageLanguageInvalid(Language $language, Page $page): bool
   {
     return (!$language->isDefault() && !$page->{"status{$language->id}"});
   }
 
   /**
    * Determine if the site uses the LanguageSupportPageNames module.
+   *
    * @return bool
    */
-  protected function siteUsesLanguageSupportPageNames()
+  protected function siteUsesLanguageSupportPageNames(): bool
   {
     return $this->modules->isInstalled('LanguageSupportPageNames');
   }
 
   /**
-   * Add alternative languges, including current.
+   * Add languages to the location entry.
+   *
    * @param Page $page
-   * @param Url  $url
+   * @param Url $url
+   * @return void
    */
-  protected function addAltLanguages($page, $url)
+  protected function addLanguages(Page $page, Url $url): void
   {
     foreach ($this->languages as $altLanguage) {
       if ($this->pageLanguageInvalid($altLanguage, $page)) {
         continue;
       }
-      if ($altLanguage->isDefault()
-        && $this->pages->get(1)->name === 'home'
-        && !$this->modules->LanguageSupportPageNames->useHomeSegment
-        && !empty($this->sitemap_default_iso)) {
-        $languageIsoName = $this->sitemap_default_iso;
-      } else {
-        $languageIsoName = $this->pages->get(1)->localName($altLanguage);
-      }
-      $url->addSubElement(new Link($languageIsoName, $page->localHttpUrl($altLanguage)));
+
+      $languageIsoName = $this->getLanguageIsoName($altLanguage);
+      $url->addExtension(new Link($languageIsoName, $page->localHttpUrl($altLanguage)));
     }
   }
 
   /**
-   * Generate an image tag for the current image in the loop
-   * @param  Pageimage $image
-   * @param  Language  $language
-   * @return Image
+   * Get a language's ISO name
+   *
+   * @param Language $laguage
+   * @return string
    */
-  protected function addImage($image, $language = null)
+  protected function getLanguageIsoName(Language $language): string
   {
-    $locImage = new Image($image->httpUrl);
-    foreach (self::IMAGE_FIELDS as $imageMetaMethod => $imageMetaValues) {
-      foreach (explode('|', $imageMetaValues) as $imageMetaValue) {
-        if ($language != null && !$language->isDefault() && $image->{"$imageMetaValue{$language->id}"}) {
-          $imageMetaValue .= $language->id;
-        }
-        if ($image->$imageMetaValue) {
-          if ($imageMetaMethod === 'License') {
-            // Skip invalid licence URLs
-            if (!filter_var($image->$imageMetaValue, FILTER_VALIDATE_URL)) {
-              continue;
-            }
-          }
-          $locImage->{"set{$imageMetaMethod}"}($image->$imageMetaValue);
-        }
-      }
-    }
+    $usesDefaultIso = $language->isDefault()
+      && $this->pages->get(1)->name === 'home'
+      && !$this->modules->LanguageSupportPageNames->useHomeSegment
+      && !empty($this->sitemap_default_iso);
 
-    return $locImage;
-  }
-
-  /**
-   * Add images to the current Url
-   * @param Url      $url
-   * @param Language $language
-   */
-  protected function addImages($page, $url, $language = null)
-  {
-    // Loop through declared image fields and skip non image fields
-    if ($this->sitemap_image_fields) {
-      foreach ($this->sitemap_image_fields as $imageFieldName) {
-        $page->of(false);
-        $imageField = $page->$imageFieldName;
-        if ($imageField) {
-          foreach ($imageField as $image) {
-            if ($image instanceof Pageimage || $image instanceof \ProcessWire\Pageimage) {
-              $url->addSubElement($this->addImage($image, $language));
-            }
-          }
-        }
-      }
-    }
+    return $usesDefaultIso
+      ? $this->sitemap_default_iso
+      : $this->pages->get(1)->localName($language);
   }
 
   /**
    * Determine if a page can be included in the sitemap
-   * @param  $page
-   * @param  $options
+   *
+   * @param Page $page
+   * @param array $options
    * @return bool
    */
-  public function pageIsIncludible($page, $options)
+  public function canBeIncluded(Page $page, ?array $options): bool
   {
     // If it's the home page, it's always includible.
     if ($page->id === 1) {
@@ -505,20 +449,27 @@ class MarkupSitemap extends WireData implements Module
   /**
    * Recursively add pages in each language with
    * alternate language and image sub-elements.
-   * @param  $page
+   *
+   * @param Page $page
+   * @return void
    */
-  protected function addPages($page)
+  protected function addPagesFromRoot(Page $page): void
   {
     // Get the saved options for this page
-    $pageSitemapOptions = $this->modules->getConfig($this, "o{$page->id}");
+    $pageSitemapOptions = array_merge(
+      static::$defaultPageOptions,
+      $this->modules->getConfig($this, "o$page->id") ?: [],
+    );
 
     // If the template that this page belongs to is not using sitemap options
     // (per the module's current configuration), then we need to revert the keys
     // in $pageSitemapOptions to their defaults so as to prevent their
     // saved options from being used in this cycle.
-    if ($this->sitemap_include_templates !== null
+    if (
+      $this->sitemap_include_templates !== null
       && !in_array($page->template->name, $this->sitemap_include_templates)
-      && is_array($pageSitemapOptions)) {
+      && is_array($pageSitemapOptions)
+    ) {
       array_walk_recursive($pageSitemapOptions, function (&$value) {
         $value = false;
       });
@@ -526,7 +477,7 @@ class MarkupSitemap extends WireData implements Module
 
     // If the page is viewable and not excluded or we’re working with the root page,
     // begin generating the sitemap by adding pages recursively. (Root is always added.)
-    if ($page->viewable() && $this->pageIsIncludible($page, $pageSitemapOptions)) {
+    if ($page->viewable() && $this->canBeIncluded($page, $pageSitemapOptions)) {
       // If language support is enabled, then we need to loop through each language
       // to generate <loc> for each language with all alternates, including the
       // current language. Then add image references with multi-language support.
@@ -535,29 +486,38 @@ class MarkupSitemap extends WireData implements Module
           if ($this->pageLanguageInvalid($language, $page) || !$page->viewable($language)) {
             continue;
           }
+
           $url = new Url($page->localHttpUrl($language));
-          $url->setLastMod(date('c', $page->modified));
-          $this->addAltLanguages($page, $url);
+          $url->setLastMod(ParseTimestamp::fromInt($page->modified));
+          $this->addLanguages($page, $url);
+
           if ($pageSitemapOptions['priority']) {
-            $url->setPriority($this->formatPriorityFloat($pageSitemapOptions['priority']));
+            $url->setPriority(ParseFloat::asString($pageSitemapOptions['priority']));
           }
+
           if (!$pageSitemapOptions['excludes']['images']) {
             $this->addImages($page, $url, $language);
           }
-          $this->urlSet->addUrl($url);
+
+          $this->urlSet->add($url);
+          $this->addAdditionalPages($page, $language);
         }
       } else {
         // If multi-language support is not enabled, then we only need to
         // add the current URL to a new <loc>, along with images.
         $url = new Url($page->httpUrl);
-        $url->setLastMod(date('c', $page->modified));
+        $url->setLastMod(ParseTimestamp::fromInt($page->modified));
+
         if ($pageSitemapOptions['priority']) {
-          $url->setPriority($this->formatPriorityFloat($pageSitemapOptions['priority']));
+          $url->setPriority(ParseFloat::asString($pageSitemapOptions['priority']));
         }
+
         if (!$pageSitemapOptions['excludes']['images']) {
           $this->addImages($page, $url);
         }
-        $this->urlSet->addUrl($url);
+
+        $this->urlSet->add($url);
+        $this->addAdditionalPages($page);
       }
     }
 
@@ -577,144 +537,134 @@ class MarkupSitemap extends WireData implements Module
       // Check for children and include where possible.
       if ($page->hasChildren($selector)) {
         foreach ($page->children($selector) as $child) {
-          $this->addPages($child);
+          $this->addPagesFromRoot($child);
         }
       }
     }
   }
 
   /**
+   * Add additional pages supplied via the getAdditionalPages() hook
+   *
+   * @param Page $page
+   * @param Language $language
+   * @return void
+   */
+  protected function addAdditionalPages(Page $page, Language $language = null): void
+  {
+    $additionalPages = $this->getAdditionalPages($page, $language);
+
+    // Process each page from the data provided in the hook
+    foreach ($additionalPages as $key => $item) {
+      if (!$item['url']) {
+        continue;
+      }
+
+      $url = new Url($item['url']);
+      $modified = isset($item['modified']) ? $item['modified'] : $page->modified;
+
+      $url->setLastMod(ParseTimestamp::fromInt($modified));
+
+      if (isset($item['priority'])) {
+        $url->setPriority(ParseFloat::asString($item['priority']));
+      }
+
+      // If language support is enabled, then we need to loop through each language
+      // and add the alternate URLs of each additional page
+      if ($this->siteUsesLanguageSupportPageNames()) {
+        foreach ($this->languages as $language) {
+          // Generate the additional URLs in the alternate language
+          // and check if the same item is found within the alternate language URLs
+          $urlsInLanguage = $this->getAdditionalPages($page, $language);
+
+          if (isset($urlsInLanguage[$key])) {
+            $languageItem = $urlsInLanguage[$key];
+            if (!$languageItem['url']) {
+              continue;
+            }
+
+            // Add the alternate language URL
+            $languageIsoName = $this->getLanguageIsoName($language);
+            $url->addExtension(new Link($languageIsoName, $languageItem['url']));
+          }
+        }
+      }
+
+      $this->urlSet->add($url);
+    }
+  }
+
+  /**
    * Build a new sitemap (called when cache doesn't have one or we're debugging)
+   *
+   * @param string $rootPage
    * @return string
    */
-  protected function buildNewSitemap($rootPage)
+  protected function buildNewSitemap(string $rootPage): string
   {
     $this->urlSet = new Urlset();
-    $this->addPages($this->pages->get($rootPage));
-    $sitemapOutput = new Output();
+    $this->addPagesFromRoot($this->pages->get($rootPage));
+    $writer = new XmlWriterDriver();
+
+    $timestamp = date('c');
+    $writer->addComment("Last generated: $timestamp");
+
     if ($this->sitemap_stylesheet) {
-      $sitemapOutput->addProcessingInstruction(
+      $writer->addProcessingInstructions(
         'xml-stylesheet',
         'type="text/xsl" href="' . $this->getStylesheetUrl() . '"'
       );
     }
 
-    return $sitemapOutput->setIndented(true)->getOutput($this->urlSet);
+    $this->urlSet->accept($writer);
+
+    return $writer->output();
   }
 
   /**
    * If using a stylesheet, return its absolute URL.
+   *
    * @return string
    */
-  protected function getStylesheetUrl()
+  protected function getStylesheetUrl(): string
   {
-    if ($this->sitemap_stylesheet_custom
-      && filter_var($this->sitemap_stylesheet_custom, FILTER_VALIDATE_URL)) {
+    if (
+      $this->sitemap_stylesheet_custom
+      && filter_var($this->sitemap_stylesheet_custom, FILTER_VALIDATE_URL)
+    ) {
       return $this->sitemap_stylesheet_custom;
     }
 
-    return $stylesheetPath = $this->urls->httpSiteModules . 'MarkupSitemap/assets/sitemap-stylesheet.xsl';
+    return "{$this->config->urls->MarkupSitemap}/assets/sitemap-stylesheet.xsl";
   }
 
   /**
-   * Dump vars and die.
+   * This hook adds support for pages that do not exist in the Page Tree,
+   * such as those build behind a URL segment.
    *
-   * @param  mixed  $mixed The vars to dump
-   * @return void
-   */
-  protected function dd()
-  {
-    $this->dump(func_get_args()) && die;
-  }
-
-  /**
-   * Dump vars.
+   * It receives the actual parent Page as well as the Language, in the case
+   * of a multi-language setup. The return value must b an array of
+   * additional URL objects, containing the following three keys:
    *
-   * @param  mixed  $mixed The vars to dump
-   * @return void
-   */
-  protected function dump()
-  {
-    $this->header();
-    array_map(
-      function ($mixed) {
-        var_dump($mixed);
-      },
-      func_get_args()
-    );
-
-    return true;
-  }
-
-  /**
-   * Prepare the content-type header
+   * `url` string, required
+   * `modified` int, optional
+   * `priority` float|string, optional
    *
-   * @return void
-   */
-  protected function header()
-  {
-    $header = 'Content-Type: text/plain';
-    if (!$this->headerPrepared($header)) {
-      header($header);
-      $this->timestamp = -microtime(true);
-    }
-  }
-
-  /**
-   * Determine if a header has been prepared.
+   * To associate additional pages with their alternate-language variants, make sure
+   * to add unique keys to the result array. Ex: an index or a language-independent ID.
    *
-   * @param  $header
-   * @return bool
+   * @param Page $page
+   * @param Language $language
+   * @return array
    */
-  protected function headerPrepared($header)
+  protected function ___getAdditionalPages(Page $page, Language $language = null): array
   {
-    $header = trim($header, ': ');
+    $return = [];
 
-    foreach (headers_list() as $listedHeader) {
-      if (stripos($listedHeader, $header) !== false) {
-        return true;
-      }
+    if ($this->siteUsesLanguageSupportPageNames()) {
+      static::applyLanguageSupportHooks();
     }
 
-    return false;
-  }
-
-  /**
-   * Print vars and die.
-   *
-   * @param  mixed  $mixed The vars to print
-   * @return void
-   */
-  protected function pd()
-  {
-    $this->printVars(func_get_args()) && die;
-  }
-
-  /**
-   * Print vars.
-   *
-   * @param  mixed  $mixed The vars to print
-   * @return void
-   */
-  protected function printVars()
-  {
-    $this->header();
-    array_map(
-      function ($mixed) {
-        print_r($mixed);
-      },
-      func_get_args()
-    );
-
-    return true;
-  }
-
-  /**
-   * Log things to a dedicated log file.
-   * @param $content
-   */
-  protected function logme($content)
-  {
-    if ($this->config->debug) $this->log->save('markup-sitemap', $content);
+    return $return;
   }
 }

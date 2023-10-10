@@ -41,7 +41,7 @@ $config->useFunctionsAPI = true;
 $config->useMarkupRegions = true;
 $config->templateCompile = false;
 $config->moduleInstall('download', true);
-$config->tableSalt = '5655abe00ae24bd4c867f6b88b9bb54bf6abb2e5'; 
+$config->tableSalt = 'bba773df08fc8fd9f84e75d08234bcf27b922ccb'; 
 $config->defaultAdminTheme = 'AdminThemeUikit';
 
 

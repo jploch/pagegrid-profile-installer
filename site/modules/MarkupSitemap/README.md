@@ -6,6 +6,12 @@ Building on [MarkupSitemapXML](https://github.com/Notanotherdotcom/MarkupSitemap
 
 ### Getting Started
 
+```
+composer require rockett/sitemap
+```
+
+OR
+
 In ProcessWire, install MarkupSitemap via the module installer. Enter `MarkupSitemap` into Modules > Install > New > Add Module from Directory. After installation, the sitemap will immediately be made available at `/sitemap.xml`.
 
 If you’re looking for a basic sitemap, there’s nothing more you need to do. 🎇
@@ -49,6 +55,10 @@ If you’ve set your home page to not include a language ISO (default language n
 #### Page priority
 
 On each page that has sitemap options, you can set a priority between 0.0 and 1.0. You may not need to use this any many cases, but you may wish to give emphasis to certain child pages over their parents. Search engines tend to use other factors in determining priority, and so this option is not guaranteed to make a difference to your rankings.
+
+#### Cache
+
+By default, Sitemap will cache the output of your sitemap to improve request-performance. Thanks to an update from [@teppo](https://processwire.com/talk/profile/175-teppo/), you can now select the caching method you’d like to use (MarkupCache or WireCache, the former being the default), and set the Cache TTL (expiry period).
 
 ---
 

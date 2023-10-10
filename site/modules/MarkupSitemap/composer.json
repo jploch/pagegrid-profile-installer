@@ -1,0 +1,19 @@
+{
+  "name": "rockett/sitemap",
+  "description": "A Markup Module that renders an XML sitemap for your ProcessWire powered site. Supports multi-language and multi-site.",
+  "type": "pw-module",
+  "license": "ISC",
+  "require": {
+    "php": "^7.4|^8.0",
+    "wireframe-framework/processwire-composer-installer": "^1.0"
+  },
+  "extra": {
+    "installer-name": "MarkupSitemap"
+  },
+  "config": {
+    "allow-plugins": {
+      "hari/pw-module": true,
+      "wireframe-framework/processwire-composer-installer": true
+    }
+  }
+}

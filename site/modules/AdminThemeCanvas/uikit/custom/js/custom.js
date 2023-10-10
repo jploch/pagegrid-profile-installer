@@ -62,7 +62,7 @@ $(document).ready(function () {
     $('.pw-dropdown-menu.page .subnav-list.navJSON').removeClass('navJSON');
   });
 
-  $(document).on("mouseenter", ".pw-dropdown-menu.page ul li", function () {
+  $(document).on("mouseenter", ".pw-dropdown-menu ul li", function () {
 
     var offset = $(this).offset();
     var dropdownOffset = offset.top;
@@ -84,7 +84,7 @@ $(document).ready(function () {
 
   // put tree add-new link on top
   $(document).ajaxComplete(function () {
-    $(".pw-dropdown-menu.page ul li").each(function () {
+    $(".pw-dropdown-menu ul li").each(function () {
       if ($(this).hasClass('pw-nav-add')) {
         $(this).parent().prepend($(this));
       }
