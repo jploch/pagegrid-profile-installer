@@ -617,8 +617,12 @@ class ProcessPageLister extends Process implements ConfigurableModule {
 			try {
 				$is->processInput($input->post);
 				$selector = $this->sessionGet("selector");
-				if($selector != $is->value) {
-					$this->sessionSet("selector", $is->value);
+				$isSelector = (string) $is->value; // selector from InputfieldSelector
+				if($selector === $this->defaultSelector && !strlen($isSelector)) {
+					// do not reset if selector matches default selector
+				} else if($selector != $isSelector) {
+					// reset
+					$this->sessionSet("selector", $isSelector);
 					$this->sessionSet("pageNum", 1);
 					$input->setPageNum(1);
 				}
@@ -630,9 +634,14 @@ class ProcessPageLister extends Process implements ConfigurableModule {
 		$value = $input->post('columns'); 
 		if($value !== null && $value !== 'ignore' && !in_array('disableColumns', $this->toggles)) { 
 			$columns = array();
+			$columnOptions = $this->sessionGet('columnOptions');
+			if(empty($columnOptions)) {
+				$columnOptions = $this->buildColumnsField()->getOptions();
+				$this->sessionSet('columnOptions', $columnOptions);
+			}
 			foreach($sanitizer->array($value) as $name) {
 				$name = $sanitizer->name($name); 	
-				if(strlen($name)) $columns[] = $name; 
+				if(strlen($name) && isset($columnOptions[$name])) $columns[] = $name;
 			}
 			if(count($columns)) {
 				$this->sessionSet('columns', $columns); 
@@ -1207,7 +1216,7 @@ class ProcessPageLister extends Process implements ConfigurableModule {
 	public function getSelectorTemplates($selector, $getArray = true) {
 		$return = $getArray ? array() : '';
 		$templates = array();
-		if(stripos($selector, 'template=') === false) return $return;
+		if(stripos("$selector", 'template=') === false) return $return;
 		if(!preg_match('/(?:^|[^.])\btemplate=([^,]+)/i', $selector, $matches)) return $return;
 		if(!$getArray) return $matches[1]; // return pipe separated string
 		$template = explode('|', $matches[1]); 
@@ -1252,7 +1261,13 @@ class ProcessPageLister extends Process implements ConfigurableModule {
 		if($subfield === 'keys' || $subfield === 'xtra') return false;
 		$fieldtype = $field->type;
 		$schema = $fieldtype->getDatabaseSchema($field);
-		return isset($schema[$subfield]);
+		if(isset($schema[$subfield])) return true;
+		$selectorInfo = $fieldtype->getSelectorInfo($field);
+		if(isset($selectorInfo['input']) && $selectorInfo['input'] === 'page') {
+			if(isset($selectorInfo['subfields'][$subfield])) return true;
+			if($this->wire()->pages->loader()->isNativeColumn($subfield)) return true;
+		}
+		return false;
 	}
 
 	/**
@@ -1282,6 +1297,7 @@ class ProcessPageLister extends Process implements ConfigurableModule {
 		$sanitizer = $this->wire()->sanitizer;
 		$modules = $this->wire()->modules;
 		$fields = $this->wire()->fields;
+		$adminTheme = $this->wire()->adminTheme;
 
 		/** @var Languages $languages */
 		$columns = $this->sessionGet('columns');
@@ -1292,7 +1308,7 @@ class ProcessPageLister extends Process implements ConfigurableModule {
 		/** @var MarkupAdminDataTable $table */
 		$table = $modules->get('MarkupAdminDataTable');
 		$table->setSortable(false);
-		$table->setResizable(true);
+		$table->setResizable(wireInstanceOf($adminTheme, 'AdminThemeUikit')); // non-100% width error w/default+reno themes
 		$table->setResponsive($this->responsiveTable);
 		$table->setClass('ProcessListerTable');
 		$table->setEncodeEntities(false);
@@ -1885,9 +1901,11 @@ class ProcessPageLister extends Process implements ConfigurableModule {
  	 *
 	 */
 	public function removeBlankSelectors($selector) {
-		$selector = preg_replace('/,\s*@?[_a-z0-9]+(=|!=|<=?|>=?|%=|\^=|\$=|\*=|~=)(?=,)/i', '', ",$selector");
-		$selector = trim($selector, ',');
-		return $selector;
+		// $selector = preg_replace('/,\s*@?[_a-z0-9]+(=|!=|<=?|>=?|%=|\^=|\$=|\*=|~=)(?=,)/i', '', ",$selector");
+		$opChars = str_replace('=', '', implode('', Selectors::getOperatorChars()));
+		$regex = '/,\s*@?[_.a-z0-9]+(=|<|>|[' . $opChars . ']+=)(?=,)/i';
+		$selector = preg_replace($regex, '', ",$selector,");
+		return trim($selector, ', ');
 	}
 
 

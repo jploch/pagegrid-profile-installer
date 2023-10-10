@@ -22,7 +22,7 @@
  * 
  * Thanks to @horst for his assistance with several methods in this class.
  * 
- * ProcessWire 3.x, Copyright 2022 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  * https://processwire.com
  * 
  * @method bool|string send($url, $data = array(), $method = 'POST', array $options = array())
@@ -289,6 +289,7 @@ class WireHttp extends Wire {
 	 * 
 	 */
 	public function __construct() {
+		parent::__construct();
 		$this->hasCURL = function_exists('curl_init') && !ini_get('safe_mode'); // && !ini_get('open_basedir');
 		$this->hasFopen = ini_get('allow_url_fopen');
 		$this->resetRequest();
@@ -313,7 +314,8 @@ class WireHttp extends Wire {
 	 * #pw-group-HTTP-requests
 	 *
 	 * @param string $url URL to post to (including http:// or https://)
-	 * @param mixed $data Associative array of data to send (if not already set before), or raw data to send.
+	 * @param array|string $data Associative array of data to send (if not already set before), 
+	 *   or raw string of data to send, such as JSON. 
 	 * @param array $options Optional options to modify default behavior, see the send() method for details. 
 	 * @return bool|string False on failure or string of contents received on success.
 	 * @see WireHttp::send(), WireHttp::get(), WireHttp::head()
@@ -342,7 +344,8 @@ class WireHttp extends Wire {
 	 * #pw-group-HTTP-requests
 	 *
 	 * @param string $url URL to send request to (including http:// or https://)
-	 * @param mixed $data Array of data to send (if not already set before) or raw data to send.
+	 * @param array|string $data Array of data to send (if not already set before) 
+	 *   or raw string of data to send, such as JSON.
 	 * @param array $options Optional options to modify default behavior, see the send() method for details. 
 	 * @return bool|string False on failure or string of contents received on success.
 	 * @see WireHttp::send(), WireHttp::post(), WireHttp::head(), WireHttp::getJSON()
@@ -355,7 +358,9 @@ class WireHttp extends Wire {
 	/**
 	 * Send to a URL that responds with JSON (using GET request) and return the resulting array or object.
 	 * 
-	 * #pw-group-HTTP-requests
+	 * This is the same as doing a json_decode() on the result of a regular get request.
+	 * 
+	 * #pw-internal
 	 *
 	 * @param string $url URL to send request to (including http:// or https://)
 	 * @param bool $assoc Default is to return an array (specified by TRUE). If you want an object instead, specify FALSE. 
@@ -375,7 +380,8 @@ class WireHttp extends Wire {
 	 * #pw-group-HTTP-requests
 	 *
 	 * @param string $url URL to request (including http:// or https://)
-	 * @param mixed $data Array of data to send (if not already set before) or raw data to send
+	 * @param array|string $data Array of data to send (if not already set before) 
+	 *   or raw string data to send, such as JSON.
 	 * @param array $options Optional options to modify default behavior, see the send() method for details. 
 	 * @return bool|array False on failure or Array with ResponseHeaders on success.
 	 * @see WireHttp::send(), WireHttp::post(), WireHttp::get()
@@ -396,7 +402,7 @@ class WireHttp extends Wire {
 	 * @param mixed $data Array of data to send (if not already set before) or raw data
 	 * @param bool $textMode When true function will return a string rather than integer, see the statusText() method.
 	 * @param array $options Optional options to modify default behavior, see the send() method for details. 
-	 * @return bool|integer|string False on failure or integer or string of status code (200|404|etc) on success.
+	 * @return int|string Integer or string of status code (200, 404, etc.) 
 	 * @see WireHttp::send(), WireHttp::statusText()
 	 *
 	 */
@@ -413,7 +419,7 @@ class WireHttp extends Wire {
 	 * @param string $url URL to request (including http:// or https://)
 	 * @param mixed $data Array of data to send (if not already set before) or raw data
 	 * @param array $options Optional options to modify default behavior, see the send() method for details. 
-	 * @return bool|string False on failure or string of status code + text on success.
+	 * @return string String of status code + text on success.
 	 *	Example: "200 OK', "302 Found", "404 Not Found"
 	 * @see WireHttp::send(), WireHttp::status()
 	 *
@@ -422,6 +428,66 @@ class WireHttp extends Wire {
 		return $this->status($url, $data, true, $options); 
 	}
 
+	/**
+	 * Send a DELETE request to a URL
+	 * 
+	 * “The HTTP DELETE request method deletes the specified resource.”
+	 * [More about DELETE](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/DELETE)
+	 *
+	 * #pw-group-HTTP-requests
+	 *
+	 * @param string $url URL to send to (including http:// or https://)
+	 * @param array|string $data Optional associative array of data to send (if not already set before), 
+	 *   or raw data to send (such as JSON string)
+	 * @param array $options Optional options to modify default behavior, see the send() method for details.
+	 * @return bool|string False on failure or string of contents received on success.
+	 * @since 3.0.222
+	 *
+	 */
+	public function delete($url, $data = array(), array $options = array()) {
+		return $this->send($url, $data, 'DELETE', $options);
+	}
+	
+	/**
+	 * Send a PATCH request to a URL
+	 * 
+	 * “The HTTP PATCH request method applies partial modifications to a resource.” 
+	 * [More about PATCH](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/PATCH)
+	 *
+	 * #pw-group-HTTP-requests
+	 *
+	 * @param string $url URL to PATCH to (including http:// or https://)
+	 * @param array|string $data Associative array of data to send (if not already set before),
+	 *   or raw data to send (such as JSON string)
+	 * @param array $options Optional options to modify default behavior, see the send() method for details.
+	 * @return bool|string False on failure or string of contents received on success.
+	 * @since 3.0.222
+	 *
+	 */
+	public function patch($url, $data = array(), array $options = array()) {
+		return $this->send($url, $data, 'PATCH', $options);
+	}
+	
+	/**
+	 * Send a PUT request to a URL
+	 * 
+	 * “The HTTP PUT request method creates a new resource or replaces a representation of the 
+	 * target resource with the request payload.” 
+	 * [More about PUT](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/PUT)
+	 *
+	 * #pw-group-HTTP-requests
+	 *
+	 * @param string $url URL to PUT to (including http:// or https://)
+	 * @param array|string $data Associative array of data to send (if not already set before),
+	 *   or raw data to send (such as JSON string)
+	 * @param array $options Optional options to modify default behavior, see the send() method for details.
+	 * @return bool|string False on failure or string of contents received on success.
+	 * @since 3.0.222
+	 *
+	 */
+	public function put($url, $data = array(), array $options = array()) {
+		return $this->send($url, $data, 'PUT', $options);
+	}
 
 	/**
 	 * Send the given $data array to a URL using given method (i.e. POST, GET, PUT, DELETE, etc.)
@@ -664,9 +730,9 @@ class WireHttp extends Wire {
 		$this->resetResponse();
 		$this->lastSendType = 'curl';
 		$timeout = isset($options['timeout']) ? (float) $options['timeout'] : $this->getTimeout();
+		$timeoutMS = (int) ($timeout * 1000);
 		$postMethods = array('POST', 'PUT', 'DELETE', 'PATCH'); // methods for CURLOPT_POSTFIELDS
 		$isPost = in_array($method, $postMethods);
-		$proxy = '';
 		
 		if(!empty($options['proxy'])) {
 			$proxy = $options['proxy'];
@@ -674,12 +740,14 @@ class WireHttp extends Wire {
 			$proxy = $options['curl']['http']['proxy'];
 		} else if(isset($options['http']) && !empty($options['http']['proxy'])) {
 			$proxy = $options['http']['proxy'];
+		} else {
+			$proxy = '';
 		}
 
 		$curl = curl_init();
 
-		curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, $timeout);
-		curl_setopt($curl, CURLOPT_TIMEOUT, $timeout);
+		curl_setopt($curl, CURLOPT_TIMEOUT_MS, $timeoutMS);
+		curl_setopt($curl, CURLOPT_CONNECTTIMEOUT_MS, $timeoutMS);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($curl, CURLOPT_USERAGENT, $this->getUserAgent());
 		
@@ -911,7 +979,8 @@ class WireHttp extends Wire {
 	 * @param string $toFile Filename you want to save it to (including full path).
 	 * @param array $options Optional options array for PHP's stream_context_create(), plus these optional options: 
 	 * 	- `use` or `useMethod` (string): Specify "curl", "fopen" or "socket" to force a specific method (default=auto-detect).
-	 * 	- `timeout` (float): Number of seconds till timeout.
+	 * 	- `timeout` (float): Number of seconds till timeout or omit to use previously set timeout setting or default. 
+	 *  - `fopen_bufferSize' (int): Buffer size (bytes) or 0 to disable buffer, used only by fopen method (default=1048576) 3.0.222+
 	 * @return string Filename that was downloaded (including full path).
 	 * @throws WireException All error conditions throw exceptions.
 	 * @todo update the use option to support array like the send() method
@@ -924,7 +993,8 @@ class WireHttp extends Wire {
 		$https = stripos($fromURL, 'https://') === 0;
 		$allowMethods = array('curl', 'fopen', 'socket');
 		$triedMethods = array();
-		
+		$fp = false;
+
 		if(!$http && !$https) {
 			throw new WireException($this->_('Download URLs must begin with http:// or https://'));
 		}
@@ -948,18 +1018,17 @@ class WireHttp extends Wire {
 			if(!in_array($useMethod, $allowMethods)) throw new WireException("Unrecognized useMethod: $useMethod"); 
 			if($useMethod == 'curl' && !$this->hasCURL) throw new WireException("System does not support CURL");
 			if($useMethod == 'fopen' && !$this->hasFopen) throw new WireException("System does not support fopen"); 
+		} else if($this->hasCURL) {
+			$useMethod = 'curl';
+		} else if($this->hasFopen) {
+			$useMethod = 'fopen';
 		} else {
-			if($this->hasCURL) $useMethod = 'curl';
-				else if($this->hasFopen) $useMethod = 'fopen';
-				else $useMethod = 'socket';
+			$useMethod = 'socket';
 		}
 		
-		if(($fp = fopen($toFile, 'wb')) === false) {
-			throw new WireException($this->_('fopen error for filename:') . ' ' . $toFile);
-		}
-
 		// CURL
 		if($useMethod == 'curl') {
+			$fp = $this->openWritableFile($toFile);
 			$triedMethods[] = 'curl';
 			$result = $this->downloadCURL($fromURL, $fp, $options);
 			if($result === false && !$this->httpCode) {
@@ -974,6 +1043,7 @@ class WireHttp extends Wire {
 				// WireHttp::download-OpenSSL extension required but not available, fallback to socket
 				$useMethod = 'socket';
 			} else {
+				$fp = $this->openWritableFile($toFile, $fp);
 				$result = $this->downloadFopen($fromURL, $fp, $options);
 				if($result === false && !$this->httpCode) $useMethod = 'socket'; 
 			}
@@ -981,6 +1051,7 @@ class WireHttp extends Wire {
 	
 		// SOCKET
 		if($useMethod == 'socket') {
+			$fp = $this->openWritableFile($toFile, $fp);
 			$triedMethods[] = 'socket';
 			$this->downloadSocket($fromURL, $fp, $options); 
 		}
@@ -989,7 +1060,7 @@ class WireHttp extends Wire {
 			
 		$methods = implode(", ", $triedMethods);
 		if(count($this->error) || ($this->httpCode >= 400 && isset($this->httpCodes[$this->httpCode]))) {
-			$this->wire('files')->unlink($toFile);
+			$this->wire()->files->unlink($toFile);
 			$error = $this->_('File could not be downloaded') . ' ' . htmlentities("($fromURL) ") . $this->getError() . " (tried: $methods)";
 			throw new WireException($error); 
 		} else {
@@ -997,7 +1068,7 @@ class WireHttp extends Wire {
 			$this->message("Downloaded " . htmlentities($fromURL) . " => $toFile (using: $methods) [$bytes bytes]", Notice::debug); 
 		}
 	
-		$this->wire('files')->chmod($toFile);
+		$this->wire()->files->chmod($toFile);
 		
 		return $toFile;
 	}
@@ -1018,15 +1089,20 @@ class WireHttp extends Wire {
 		$setopts = null;
 		$proxy = '';
 		
-		if(!empty($options['proxy'])) $proxy = $options['proxy'];
-			else if(isset($options['curl']) && !empty($options['curl']['http']['proxy'])) $proxy = $options['curl']['http']['proxy'];
-			else if(isset($options['http']) && !empty($options['http']['proxy'])) $proxy = $options['http']['proxy'];
+		if(!empty($options['proxy'])) {
+			$proxy = $options['proxy'];
+		} else if(isset($options['curl']) && !empty($options['curl']['http']['proxy'])) {
+			$proxy = $options['curl']['http']['proxy'];
+		} else if(isset($options['http']) && !empty($options['http']['proxy'])) {
+			$proxy = $options['http']['proxy'];
+		}
 		
 		$curl = curl_init($fromURL);
 
 		if(isset($options['timeout'])) {
-			curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, (int) $options['timeout']);
-			curl_setopt($curl, CURLOPT_TIMEOUT, (int) $options['timeout']);
+			$timeoutMS = (int) ($options['timeout'] * 1000);
+			curl_setopt($curl, CURLOPT_CONNECTTIMEOUT_MS, $timeoutMS);
+			curl_setopt($curl, CURLOPT_TIMEOUT_MS, $timeoutMS);
 		}
 		curl_setopt($curl, CURLOPT_FILE, $fp); // write curl response to file
 		curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
@@ -1069,9 +1145,13 @@ class WireHttp extends Wire {
 		// Define the options
 		$defaultOptions = array(
 			'max_redirects' => 3,
+			'fopen_bufferSize' => 1024 * 1024, // 1 megabyte default buffer size
 		);
 		
 		$options = array_merge($defaultOptions, $options);
+		$bufferSize = $options['fopen_bufferSize'];
+		unset($options['fopen_bufferSize']);
+		
 		$context = stream_context_create(
 			array(
 				'http' => $options
@@ -1080,18 +1160,35 @@ class WireHttp extends Wire {
 
 		// download the file
 		set_error_handler(array($this, '_errorHandler'));
-		$content = file_get_contents($fromURL, false, $context);
-		restore_error_handler();
-
-		if(isset($http_response_header)) $this->setResponseHeader($http_response_header);
-
-		if($content === false) {
-			$result = false;
-		} else {
-			$result = true; 
-			fwrite($fp, $content);
+		$result = false;
+		
+		if($bufferSize > 0) {
+			// download in chunks
+			$fpRemote = @fopen($fromURL, 'rb', false, $context);
+			if($fpRemote !== false) {
+				while(!feof($fpRemote)) {
+					$data = fread($fpRemote, $bufferSize);
+					fwrite($fp, $data);
+				}
+				fclose($fpRemote);
+				$result = true;
+			}
+		} 
+		
+		if($result === false) {
+			// download all at once
+			$content = file_get_contents($fromURL, false, $context);
+			if($content === false) {
+				$result = false;
+			} else {
+				$result = true;
+				fwrite($fp, $content);
+			}
 		}
 		
+		restore_error_handler();
+		if(isset($http_response_header)) $this->setResponseHeader($http_response_header);
+
 		return $result; 
 	}
 	
@@ -1114,7 +1211,28 @@ class WireHttp extends Wire {
 		if(empty($content) && !count($this->error)) $this->error[] = 'no data received'; 
 		return count($this->error) ? false : true; 
 	}
-	
+
+	/**
+	 * Open a new file for writing (for download methods)
+	 *
+	 * @param string $toFile
+	 * @param resource|false $fp
+	 * @return resource
+	 * @throws WireException
+	 * @since 3.0.222
+	 *
+	 */
+	protected function openWritableFile($toFile, $fp = false) {
+		if($fp !== false) {
+			// close existing file that was open and remove it
+			fclose($fp);
+			if(file_exists($toFile)) $this->wire()->files->unlink($toFile);
+		}
+		$fp = fopen($toFile, 'wb');
+		if($fp === false) throw new WireException($this->_('fopen error for filename:') . ' ' . $toFile);
+		return $fp;
+	}
+
 	/**
 	 * Set an array of request headers to send with GET/POST/etc. request
 	 *
@@ -1256,12 +1374,12 @@ class WireHttp extends Wire {
 	 * 
 	 * #pw-internal
 	 *
-	 * @param string $key
+	 * @param string $name
 	 * @return mixed
 	 *
 	 */
-	public function __get($key) {
-		return array_key_exists($key, $this->data) ? $this->data[$key] : null;
+	public function __get($name) {
+		return array_key_exists($name, $this->data) ? $this->data[$name] : null;
 	}
 
 	/**
@@ -1420,7 +1538,7 @@ class WireHttp extends Wire {
 				$this->responseHeaderArrays[$key] = $valueArray;
 			} else {
 				if(is_array($value)) {
-					foreach($value as $k => $v) {
+					foreach($value as $v) {
 						$this->responseHeaderArrays[$key][] = $v;
 					}
 				} else {
@@ -1488,7 +1606,7 @@ class WireHttp extends Wire {
 
 		$options = array_merge($defaultOptions, $options);
 		$headers = array_merge($defaultHeaders, $options['headers'], $headers);
-		$contentTypes = $this->wire('config')->fileContentTypes;
+		$contentTypes = $this->wire()->config->fileContentTypes;
 		
 		if($filename === false) {
 			// sending data string
@@ -1510,7 +1628,7 @@ class WireHttp extends Wire {
 		$forceDownload = $options['forceDownload'];
 		$bytesSent = 0;
 		
-		if($options['exit']) $this->wire('session')->close();
+		if($options['exit']) $this->wire()->session->close();
 		if(is_null($forceDownload)) $forceDownload = substr($contentType, 0, 1) === '+';
 		if(ini_get('zlib.output_compression')) ini_set('zlib.output_compression', 'Off');
 		$contentType = ltrim($contentType, '+');
@@ -1742,7 +1860,7 @@ class WireHttp extends Wire {
 		$options = $this->validateURLOptions;
 		$options['allowSchemes'] = $this->allowSchemes;
 		try {
-			$url = $this->wire('sanitizer')->url($url, $options); 
+			$url = $this->wire()->sanitizer->url($url, $options); 
 		} catch(WireException $e) {
 			if($throw) {
 				throw $e;

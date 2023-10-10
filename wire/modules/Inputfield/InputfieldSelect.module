@@ -8,7 +8,7 @@
  * Sublcasses will want to override the render method, but it's not necessary to override processInput().
  * Subclasses that select multiple values should implement the InputfieldHasArrayValue interface.
  * 
- * ProcessWire 3.x, Copyright 2022 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  * https://processwire.com
  *
  * @property string|int $defaultValue
@@ -222,7 +222,7 @@ class InputfieldSelect extends Inputfield implements InputfieldHasSelectableOpti
 		foreach($options as $option) {
 
 			// in an optgroup when line starts with 3 or more spaces
-			if(strpos($option, '   ') === 0 && !empty($lastOption)) {
+			if(strpos($option, '   ') === 0 && $lastOption !== '') {
 				// if no optgroupLabel, we're starting a new option group
 				if(empty($optgroupLabel)) $optgroupLabel = $lastOption; 
 				$option = trim($option);
@@ -292,7 +292,7 @@ class InputfieldSelect extends Inputfield implements InputfieldHasSelectableOpti
 			$line = trim($line);
 			$line = ltrim($line, '+');
 			if(strpos($line, 'disabled:') === 0) list(,$line) = explode('disabled:', $line, 2);
-			if(!strpos($line, '=')) continue; // 0 or false OK
+			if(strpos($line, '=') === false) continue;
 			list($key, $label) = explode('=', $line, 2);
 			if($languageID) {
 				$this->optionLanguageLabel($languageID, $key, $label); 
@@ -908,12 +908,13 @@ class InputfieldSelect extends Inputfield implements InputfieldHasSelectableOpti
 	 * 
 	 */
 	public function isEmpty() {
+		/** @var array|null|bool|string|int $value */
 		$value = $this->attr('value');
 
 		if(is_array($value)) {
 			$cnt = count($value);
 			if(!$cnt) return true; 
-			if($cnt === 1) return strlen(reset($value)) === 0; 
+			if($cnt === 1) return strlen((string) reset($value)) === 0; 
 			return false; // $cnt > 1
 
 		} else if($value === null || $value === false) {
@@ -923,7 +924,7 @@ class InputfieldSelect extends Inputfield implements InputfieldHasSelectableOpti
 			if(!array_key_exists("$value", $this->options)) return true; 
 
 		} else {
-			return strlen($value) === 0; 
+			return strlen("$value") === 0; 
 		}
 		
 		return false;

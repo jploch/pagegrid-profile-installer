@@ -1276,8 +1276,8 @@ class Selectors extends WireArray {
 	 *  - `getIndexType` (string): Index type to use in returned array: 'operator', 'className', 'class', or 'none' (default='class')
 	 *  - `getValueType` (string): Value type to use in returned array: 'operator', 'class', 'className', 'label', 'description', 'compareType', 'verbose' (default='operator').
 	 *     If 'verbose' option used then assoc array returned for each operator containing 'class', 'className', 'operator', 'compareType', 'label', 'description'.
-	 * @return array|string|int Returned array where both keys and values are operators (or values are requested 'valueType' option)
-	 *   If 'operator' option specified, return value is string, int or array (requested 'valueType'), and there is no indexType.
+	 * @return array|string|int Returned array where values are operators and keys are class names (or requested 'getIndexType or 'getValueType' options)
+	 *   If 'operator' option specified, return value is string, int or array (of requested 'getValueType'), and there is no index.
 	 * @since 3.0.154
 	 *
 	 */
@@ -1620,7 +1620,7 @@ class Selectors extends WireArray {
 	 *  - `operator` (string): Require this operator (default='' for any) 
 	 *  - `value` (string|int): Require this value (default=null for any)
 	 *  - `remove` (bool): Remove matched Selector from Selectors returned in verbose result? (default=false)
-	 * @return array|bool True of has field, false if not, or array with the following if 'verbose' option requested:
+	 * @return array|bool True if has field, false if not, or array with the following, if 'verbose' option requested:
 	 *  - `result` (bool): Did it match (true or false)
 	 *  - `selector` (Selector|null): Selector object that matched (only if result is true)
 	 *  - `selectors` (Selectors|null): Selectors object that was analyzed or null if not needed

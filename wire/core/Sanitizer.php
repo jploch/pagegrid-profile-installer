@@ -164,6 +164,20 @@ class Sanitizer extends Wire {
 	 * 
 	 */
 	protected $textTools = null;
+	
+	/**
+	 * @var null|WireNumberTools
+	 *
+	 */
+	protected $numberTools = null;
+
+	/**
+	 * Runtime caches
+	 * 
+	 * @var array 
+	 * 
+	 */
+	protected $caches = array();
 
 	/**
 	 * UTF-8 whitespace hex codes
@@ -263,6 +277,8 @@ class Sanitizer extends Wire {
 		'filename' => 's',
 		'flatArray' => 'a',
 		'float' => 'f',
+		'htmlClass' => 's', 
+		'htmlClasses' => 's',
 		'httpUrl' => 's',
 		'hyphenCase' => 's',
 		'int' => 'i',
@@ -362,8 +378,11 @@ class Sanitizer extends Wire {
 				$value = mb_strtolower($value);
 
 				if(empty($replacements)) {
-					$configData = $this->wire()->modules->getModuleConfigData('InputfieldPageName');
-					$replacements = empty($configData['replacements']) ? InputfieldPageName::$defaultReplacements : $configData['replacements'];
+					$modules = $this->wire()->modules;
+					if($modules) {
+						$configData = $this->wire()->modules->getModuleConfigData('InputfieldPageName');
+						$replacements = empty($configData['replacements']) ? InputfieldPageName::$defaultReplacements : $configData['replacements'];
+					}
 				}
 
 				foreach($replacements as $from => $to) {
@@ -589,6 +608,54 @@ class Sanitizer extends Wire {
 		}
 		
 		return $value;
+	}
+
+	/**
+	 * Sanitize string to ASCII-only HTML class attribute value
+	 * 
+	 * Note that this does not support all possible characters in an HTML class attribute 
+	 * and instead focuses on the most commonly used ones. Characters allowed in HTML class
+	 * attributes from this method include: `-_:@a-zA-Z0-9`. This method does not allow
+	 * values that have no letters or digits.
+	 * 
+	 * @param string $value
+	 * @return string 
+	 * @since 3.0.212
+	 * 
+	 */
+	public function htmlClass($value) {
+		$value = trim("$value");
+		if(empty($value)) return '';
+		$extras = array('-', '_', ':', '@');
+		$value = $this->nameFilter($value, $extras, '-');
+		$value = ltrim($value, '0123456789'); // cannot begin with digit
+		if(trim($value, implode('', $extras)) === '') $value = ''; // do not allow extras-only class
+		return $value;
+	}
+
+	/**
+	 * Sanitize string to ASCII-only space-separated HTML class attribute values with no duplicates
+	 * 
+	 * See additional notes in `Sanitizer::htmlClass()` method. 
+	 *
+	 * @param string|array $value
+	 * @param bool $getArray Get array rather than string? (default=false)
+	 * @return string|array
+	 * @since 3.0.212
+	 *
+	 */
+	public function htmlClasses($value, $getArray = false) {
+		if(is_array($value)) $value = implode(' ', $value);
+		$value = str_replace(array("\n", "\r", "\t", ",", "."), ' ', $value);
+		$value = trim("$value");
+		if(empty($value)) return $getArray ? array() : '';
+		$a = array();
+		foreach(explode(' ', $value) as $c) {
+			$c = $this->htmlClass($c);
+			if(!empty($c)) $a[$c] = $c;
+		}
+		if($getArray) return array_values($a);
+		return count($a) ? implode(' ', $a) : '';
 	}
 
 	/**
@@ -849,8 +916,15 @@ class Sanitizer extends Wire {
 
 		// proceed only if value has some non-ascii characters
 		if(ctype_alnum(str_replace($extras, '', $value))) {
-			// let regular pageName sanitizer handle this
-			return $this->pageName($value, false, $maxLength);
+			$k = 'pageNameUTF8.whitelistIsLowercase';
+			if(!isset($this->caches[$k])) {
+				$this->caches[$k] = $whitelist !== false && $tt->strtolower($whitelist) === $whitelist;
+			}
+			if($this->caches[$k] || $tt->strtolower($value) === $value) {
+				// whitelist supports only lowercase OR value is all lowercase 
+				// let regular pageName sanitizer handle this
+				return $this->pageName($value, false, $maxLength);
+			}
 		}
 
 		// validate that all characters are in our whitelist
@@ -1597,7 +1671,7 @@ class Sanitizer extends Wire {
 			'outCharset' => 'UTF-8',  // output charset
 			'truncateTail' => true, // if truncate necessary for maxLength, remove chars from tail? False to truncate from head.
 			'trim' => true, // trim whitespace from beginning/end, or specify character(s) to trim, or false to disable
-			);
+		);
 		
 		static $alwaysReplace = null;
 		$truncated = false;
@@ -1608,13 +1682,9 @@ class Sanitizer extends Wire {
 		if($options['maxBytes'] < 0) $options['maxBytes'] = 0;
 		
 		if($alwaysReplace === null) {
-			if($this->multibyteSupport) {
-				$alwaysReplace = array(
-					mb_convert_encoding('&#8232;', 'UTF-8', 'HTML-ENTITIES') => '', // line-seperator that is sometimes copy/pasted
-				);
-			} else {
-				$alwaysReplace = array();
-			}
+			$alwaysReplace = array(
+				html_entity_decode('&#8232;', ENT_QUOTES, 'UTF-8') => '', // line-seperator that is sometimes copy/pasted
+			);
 		}
 		
 		if($options['reduceSpace'] !== false && $options['stripSpace'] === false) {
@@ -1668,7 +1738,7 @@ class Sanitizer extends Wire {
 		}
 		
 		if($options['stripQuotes']) {
-			$value = str_replace(array('"', "'"), (is_string($options['stripQuotes']) ? $options['strip_quotes'] : ''), $value);
+			$value = str_replace(array('"', "'"), (is_string($options['stripQuotes']) ? $options['stripQuotes'] : ''), $value);
 		}
 		
 		if($options['trim']) {
@@ -1896,13 +1966,19 @@ class Sanitizer extends Wire {
 
 		if(strpos($value, '<') !== false) {
 			// tag replacements before strip_tags()
-			$regex =
-				'!<(?:' .
-					'/?(?:ul|ol|p|h\d|div)(?:>|\s[^><]*)' .
-					'|' . 
-					'(?:br[\s/]*)' .
-				')>!is';
-			$value = preg_replace($regex, $newline, $value);
+			if(stripos($value, '</ul>') || stripos($value, '</ol>')) {
+				$regex = '!<(?:/?(?:ul|ol)(?:>|\s[^><]*))>!i';
+				$value = preg_replace($regex, '', $value);
+			}
+			if(stripos($value, '</p>') || stripos($value, '</h') || stripos($value, '</div>')) {
+				$regex =
+					'!<(?:' .
+						'/?(?:p|h\d|div)(?:>|\s[^><]*)' .
+						'|' .
+						'(?:br[\s/]*)' .
+					')>!is';
+				$value = preg_replace($regex, $newline, $value);
+			}
 			if(stripos($value, '</li>')) {
 				$value = preg_replace('!</li>\s*<li!is', "$options[separator]<li", $value);
 			}
@@ -3914,7 +3990,7 @@ class Sanitizer extends Wire {
 		$datetime = $this->wire()->datetime;
 		$iso8601 = 'Y-m-d H:i:s';
 		$_value = trim($this->string($value)); // original value string
-		if(empty($value)) return $options['default'];
+		if(empty($value) && !is_int($value) && !strlen("$value")) return $options['default'];
 		if(!is_string($value) && !is_int($value)) $value = $this->string($value);
 		if(ctype_digit("$value")) {
 			// value is in unix timestamp format
@@ -3925,7 +4001,7 @@ class Sanitizer extends Wire {
 			$value = $datetime->stringToTimestamp($value, $format); 
 		}
 		// value is now a unix timestamp
-		if(empty($value)) return null;
+		if($value === false) return null;
 		// if format is provided and in strict mode, validate for the format and bounds
 		if($format && $options['strict']) {
 			$test = $datetime->date($format, $value);
@@ -3942,7 +4018,7 @@ class Sanitizer extends Wire {
 			if($value > $max) return null;
 		}
 		if(!empty($options['returnFormat'])) $value = wireDate($options['returnFormat'], $value);
-		return empty($value) ? null : $value;
+		return ($value === null || $value === false) ? null : $value;
 	}
 
 	/**
@@ -5272,6 +5348,24 @@ class Sanitizer extends Wire {
 		}
 		return $this->textTools;
 	}
+	
+	/**
+	 * Get instance of WireNumberTools
+	 *
+	 * #pw-group-numbers
+	 * #pw-group-other
+	 *
+	 * @return WireNumberTools
+	 * @since 3.0.214
+	 *
+	 */
+	public function getNumberTools() {
+		if(!$this->numberTools) {
+			$this->numberTools = new WireNumberTools();
+			$this->wire($this->numberTools);
+		}
+		return $this->numberTools;
+	}
 
 	/**********************************************************************************************************************
 	 * FILE VALIDATORS
@@ -5699,4 +5793,3 @@ class Sanitizer extends Wire {
 	}
 
 }
-

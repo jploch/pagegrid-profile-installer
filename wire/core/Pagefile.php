@@ -12,7 +12,7 @@
  * Pagefile objects are contained by a `Pagefiles` object. 
  * #pw-body
  * 
- * ProcessWire 3.x, Copyright 2022 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  * https://processwire.com
  *
  * @property-read string $url URL to the file on the server.
@@ -45,6 +45,7 @@
  * @property User|NullPage $createdUser User that added/uploaded the file or NullPage if not known (3.0.154)+. #pw-group-other
  * @property User|NullPage $modifiedUser User that last modified the file or NullPage if not known (3.0.154)+. #pw-group-other
  * @property bool $formatted True when value has had Textformatters applied. #pw-internal
+ * @property string $uploadName Original unsanitized filename at upload, see notes for uploadName() method (3.0.212+). #pw-group-other
  * 
  * @method void install($filename)
  * @method string httpUrl()
@@ -356,7 +357,7 @@ class Pagefile extends WireData implements WireArrayItem {
 		$key = $type === 'created' ? '_createdUser' : '_modifiedUser';
 		if(!$this->$key) {
 			$id = (int) parent::get($type . '_users_id');
-			$this->$key = $id ? $this->wire('users')->get($id) : new NullPage(); 
+			$this->$key = ($id ? $this->wire()->users->get($id) : new NullPage()); 
 		}
 		return $this->$key;
 	}
@@ -576,7 +577,7 @@ class Pagefile extends WireData implements WireArrayItem {
 
 		if(is_null($language)) {	
 			// return description for current user language, or inherit from default if not available
-			$user = $this->wire('user'); 
+			$user = $this->wire()->user; 
 			$value = null;
 			if($user->language && $user->language->id) {
 				$value = parent::get("description{$user->language}");
@@ -701,6 +702,9 @@ class Pagefile extends WireData implements WireArrayItem {
 				break;
 			case 'fieldValues':	
 				$value = $this->fieldValues;
+				break;
+			case 'uploadName': 	
+				$value = $this->uploadName();
 				break;
 			default:
 				$value = $this->getFieldValue($key);
@@ -931,6 +935,24 @@ class Pagefile extends WireData implements WireArrayItem {
 		$basename = parent::get('basename'); 
 		if(!$ext) $basename = basename($basename, "." . $this->ext());
 		return $basename;
+	}
+
+	/**
+	 * Original and unsanitized filename at the time it was uploaded
+	 *
+	 * Returned value is also entity encoded if $page’s output formatting state is ON.
+	 * For files uploaded in ProcessWire 3.0.212 or newer. Falls back to current file
+	 * basename for files that were uploaded prior to 3.0.212. 
+	 * 
+	 * @return string
+	 * @since 3.0.212
+	 * 
+	 */
+	public function uploadName() {
+		$uploadName = (string) $this->filedata('uploadName');
+		if(!strlen($uploadName)) $uploadName = $this->basename();
+		if($this->page && $this->page->of()) $uploadName = $this->wire()->sanitizer->entities($uploadName);
+		return $uploadName;
 	}
 
 	/**
@@ -1489,4 +1511,3 @@ class Pagefile extends WireData implements WireArrayItem {
 		return $info;
 	}
 }
-

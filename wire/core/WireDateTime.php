@@ -5,7 +5,7 @@
  * 
  * #pw-summary The $datetime API variable provides helpers for working with dates/times and conversion between formats.
  * 
- * ProcessWire 3.x, Copyright 2019 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  * https://processwire.com
  * 
  * @method string relativeTimeStr($ts, $abbreviate = false, $useTense = true)
@@ -122,6 +122,8 @@ class WireDateTime extends Wire {
 		'r' => array(	'', 	'',		'\w+, \d+ \w+ \d{4}'),		// RFC-2822 date			Thu, 21 Dec 2000 16:01:07 +0200
 		'U' => array(	'%s', 	'@', 	'\d+'),				// Unix timestamp			123344556	
 	);
+	
+	protected $caches = array();
 
 	/**
 	 * Return all predefined PHP date() formats for use as dates
@@ -404,17 +406,29 @@ class WireDateTime extends Wire {
 			// ts is a non-integer string, we assume to be a strtotime() compatible formatted date
 			$ts = strtotime($ts);
 		}
-		if($format == '') $format = $this->wire('config')->dateFormat;
-		if($format == 'relative') $value = $this->relativeTimeStr($ts);
-			else if($format == 'relative-') $value = $this->relativeTimeStr($ts, false, false);
-			else if($format == 'rel') $value = $this->relativeTimeStr($ts, true);
-			else if($format == 'rel-') $value = $this->relativeTimeStr($ts, true, false);
-			else if($format == 'r') $value = $this->relativeTimeStr($ts, 1);
-			else if($format == 'r-') $value = $this->relativeTimeStr($ts, 1, false);
-			else if($format == 'ts') $value = $ts;
-			else if(strpos($format, '%') !== false && version_compare(PHP_VERSION, '8.1.0', '<')) $value = $this->strftime($format, $ts);
-			else $value = date($format, $ts);
-		return $value;
+		if($format == '') $format = $this->wire()->config->dateFormat;
+		if($format == 'relative') {
+			$value = $this->relativeTimeStr($ts);
+		} else if($format == 'relative-') {
+			$value = $this->relativeTimeStr($ts, false, false);
+		} else if($format == 'rel') {
+			$value = $this->relativeTimeStr($ts, true);
+		} else if($format == 'rel-') {
+			$value = $this->relativeTimeStr($ts, true, false);
+		} else if($format == 'r') {
+			$value = $this->relativeTimeStr($ts, 1);
+		} else if($format == 'r-') {
+			$value = $this->relativeTimeStr($ts, 1, false);
+		} else if($format == 'ts') {
+			$value = $ts;
+		} else if(strpos($format, '%') !== false && version_compare(PHP_VERSION, '8.1.0', '<')) {
+			$value = $this->strftime($format, $ts);
+		} else {
+			$value = date($format, $ts);
+			$value = $this->localizeDateText($value, $format);
+		}
+			
+		return $value; 
 	}
 
 	/**
@@ -481,7 +495,10 @@ class WireDateTime extends Wire {
 		
 		$format = $this->strftimeToDateFormat($format);
 
-		return date($format, $timestamp);
+		$value = date($format, $timestamp);
+		$value = $this->localizeDateText($value, $format);
+		
+		return $value;
 	}
 
 	/**
@@ -646,17 +663,44 @@ class WireDateTime extends Wire {
 	/**
 	 * Render an elapsed time string
 	 * 
+	 * If the `$stop` argument is omitted then it is assumed to be the current time. 
+	 * The maximum period used is weeks, as months and years are not fixed length periods. 
+	 * 
+	 * ~~~~~
+	 * $start = '2023-09-08 08:33:52';
+	 * $stop = '2023-09-09 10:47:23';
+	 * 
+	 * // Regular: 1 day 2 hours 13 minutes 31 seconds
+	 * echo $datetime->elapsedTimeStr($start, $stop);
+	 *
+	 * // Abbreviated: 1 day 2 hrs 13 mins 31 secs 
+	 * echo $datetime->elapsedTimeStr($start, $stop, true);
+	 * 
+	 * // Abbreviated with exclusions: 1 day 2 hrs
+	 * echo $datetime->elapsedTimeStr($start, $stop, true, [ 'exclude' => 'minutes seconds' ]);
+	 * 
+	 * // Optional 3.0.227+ usage and inclusions: 26 hours 13 minutes
+	 * echo $datetime->elapsedTimeStr($start, [ 'stop' => $stop, 'include' => 'hours minutes' ]);
+	 * ~~~~~
+	 * 
 	 * @param int|string $start Starting timestamp or date/time string.
-	 * @param int|string $stop Ending timestamp or date/time string, or omit for now. 
+	 * @param int|string|array $stop Ending timestamp or date/time string, omit for “now”, or: 
+	 *  - In 3.0.227+ you may optionally substitute the `$options` array argument here. When doing so, 
+	 *    all remaining arguments are ignored and the `stop` and `abbreviate` (if needed) may be 
+	 *    specified in the given options array, along with any other options.
 	 * @param bool|int|array $abbreviate
 	 *  - Specify boolean FALSE for verbose elapsed time string without abbreviations (default). 
 	 *  - Specify boolean TRUE for abbreviations (abbreviated where common, not always different from non-abbreviated).
-	 *  - Specify integer 1 for extra short abbreviations (all terms abbreviated into shortest possible string).
-	 *  - Specify integer 0 for digital elapsed time string like “00:01:12” referring to hours:minutes:seconds. 
+	 *  - Specify integer `1` for extra short abbreviations (all terms abbreviated into shortest possible string).
+	 *  - Specify integer `0` for digital elapsed time string like “00:01:12” referring to hours:minutes:seconds.
+	 *  - Note that when using `0` no options apply except except for `exclude[seconds]` option.
 	 * @param array $options Additional options:
 	 *  - `delimiter` (string): String to separate time periods (default=' ').
+	 *  - `getArray` (bool): Return an array of integers indexed by period name (rather than a string)? 3.0.227+
 	 *  - `exclude` (array|string): Exclude these periods, one or more of: 'seconds', 'minutes', 'hours', 'days', 'weeks' (default=[])
-	 * @return string
+	 *  - `include` (array|string): Include only these periods, one or more of: 'seconds', 'minutes', 'hours', 'days', 'weeks' (default=[]) 3.0.227+
+	 *  - Note the exclude and include options should not be used together, and the include option requires 3.0.227+. 
+	 * @return string|array Returns array only if the `getArray` option is true, otherwise returns a string.
 	 * @since 3.0.129
 	 * 
 	 */
@@ -665,72 +709,131 @@ class WireDateTime extends Wire {
 		$defaults = array(
 			'delimiter' => ' ', 
 			'exclude' => array(),
+			'include' => array(),
+			'getArray' => false, 
 		);
-	
+		
+		if(is_array($stop)) {
+			// options specified in $stop argument 
+			$options = $stop;
+			$stop = isset($options['stop']) ? $options['stop'] : null;
+			$abbreviate = isset($options['abbreviate']) ? $options['abbreviate'] : false;
+		}
+
 		$options = array_merge($defaults, $options);
-		if(is_string($options['exclude'])) $options['exclude'] = explode(' ', $options['exclude']);
+		$periodNames = array('weeks', 'days', 'hours', 'minutes', 'seconds');
+		$usePeriods = array();
+		$negative = false;
+		
+		foreach(array('exclude', 'include') as $key) {
+			if(is_string($options[$key])) {
+				$value = trim($options[$key]);
+				$options[$key] = $value ? explode(' ', $value) : array();
+			} else if(!is_array($options[$key])) {
+				$options[$key] = array();
+			}
+			foreach($options[$key] as $k => $v) {
+				if(!in_array($v, $periodNames)) unset($options[$key][$k]); 
+			}
+		}
+		
+		$include = count($options['include']) && $abbreviate !== 0 ? $options['include'] : null;
+		$exclude = count($options['exclude']) ? $options['exclude'] : null;
+		
+		foreach($periodNames as $name) {
+			if($include && !in_array($name, $include)) continue;
+			if($exclude && in_array($name, $exclude)) continue;
+			$usePeriods[$name] = $name;
+		}
+		
 		if($stop === null) $stop = time();
 		if(!ctype_digit("$start")) $start = strtotime($start);
 		if(!ctype_digit("$stop")) $stop = strtotime($stop);
+		
+		if($start > $stop) {
+			list($start, $stop) = array($stop, $start);
+			$negative = true;
+		}
 
 		$times = array();
 		$seconds = $stop - $start;
-		
-		if($seconds >= 604800 && $abbreviate !== 0 && !in_array('weeks', $options['exclude'])) {
+	
+		if($seconds >= 604800 && $abbreviate !== 0 && isset($usePeriods['weeks'])) {
 			$weeks = floor($seconds / 604800);
 			$seconds = $seconds - ($weeks * 604800);
-			$key = $weeks === 1 ? 'week' : 'weeks';
+			$key = $weeks == 1 ? 'week' : 'weeks';
 			$times[$key] = $weeks;
-		}
-		
-		if($seconds >= 86400 && $abbreviate !== 0 && !in_array('days', $options['exclude'])) {
-			$days = floor($seconds / 86400); 
-			$seconds = $seconds - ($days * 86400); 
-			$key = $days === 1 ? 'day' : 'days';
-			$times[$key] = $days;
+		} else {
+			$times['weeks'] = 0;
 		}
 
-		if($seconds >= 3600 && !in_array('hours', $options['exclude'])) {
+		if($seconds >= 86400 && $abbreviate !== 0 && isset($usePeriods['days'])) {
+			$days = floor($seconds / 86400); 
+			$seconds = $seconds - ($days * 86400); 
+			$key = $days == 1 ? 'day' : 'days';
+			$times[$key] = $days;
+		} else {
+			$times['days'] = 0;
+		}
+
+		if($seconds >= 3600 && isset($usePeriods['hours'])) {
 			$hours = floor($seconds / 3600);
 			$seconds = $seconds - ($hours * 3600);
-			$key = $hours === 1 ? 'hour' : 'hours';
+			$key = $hours == 1 ? 'hour' : 'hours';
 			$times[$key] = $hours;
 		} else {
+			$times['hours'] = 0;
 			$hours = 0;
 		}
 
-		if($seconds >= 60 && !in_array('minutes', $options['exclude'])) {
+		if($seconds >= 60 && isset($usePeriods['minutes'])) {
 			$minutes = floor($seconds / 60);
 			$seconds = $seconds - ($minutes * 60);
-			$key = $minutes === 1 ? 'minute' : 'minutes';
+			$key = $minutes == 1 ? 'minute' : 'minutes';
 			$times[$key] = $minutes;
 		} else {
+			$times['minutes'] = 0;
 			$minutes = 0;
 		}
 
-		if(($seconds > 0 || empty($times)) && !in_array('seconds', $options['exclude'])) {
-			$key = $seconds === 1 ? 'second' : 'seconds';
+		if(($seconds > 0 || empty($times)) && isset($usePeriods['seconds'])) {
+			$key = $seconds == 1 ? 'second' : 'seconds';
 			$times[$key] = $seconds;
 		} else {
+			$times['seconds'] = 0;
 			$seconds = 0;
 		}
 		
-		if($abbreviate === 0) {
+		if($abbreviate === 0 && !$options['getArray']) {
 			if(strlen($hours) < 2) $hours = "0$hours";
 			if(strlen($minutes) < 2) $minutes = "0$minutes";
 			if(strlen($seconds) < 2) $seconds = "0$seconds";
-			$str = "$hours:$minutes:$seconds";
+			$value = "$hours:$minutes";
+			if(isset($usePeriods['seconds'])) $value .= ":$seconds";
 		} else {
 			$periods = $this->getPeriods($abbreviate); 
 			$a = array();
+			$getArray = array();
 			foreach($times as $key => $qty) {
+				$pluralKey = rtrim($key, 's') . 's';
+				if(empty($qty) && ($pluralKey !== 'seconds' || count($a))) continue;
+				if(!isset($usePeriods[$pluralKey])) continue;
 				$sep = $abbreviate === 1 ? '' : ' ';
-				$a[] = $qty . $sep . $periods[$key];
+				$str = $qty . $sep . $periods[$key];
+				$a[] = $str;
+				$getArray[$pluralKey] = $qty;
+				$getArray[$pluralKey . 'Text'] = $str;
 			}
-			$str = implode($options['delimiter'], $a); 
+			$value = implode($options['delimiter'], $a);
+			if($negative) $value = "-$value";
+			if($options['getArray']) {
+				$getArray['negative'] = $negative;
+				$getArray['text'] = $value;
+				$value = $getArray;
+			}
 		}
 
-		return $str;
+		return $value;
 	}
 
 	/**
@@ -879,4 +982,125 @@ class WireDateTime extends Wire {
 		return $periods;
 	}
 
+	/**
+	 * Localize a date's month and day names, when present
+	 *
+	 * @param string $value Date that is already formated with $format
+	 * @param string $format Format that was used to format the date
+	 * @return string
+	 * 
+	 */
+	protected function localizeDateText($value, $format) {
+		
+		if(!$this->wire()->languages) return $value; 
+
+		$findReplace = [];
+		$f = $format;
+		$keys = array();
+		$ltrKeys = array(
+			'F' => 'monthNames',
+			'M' => 'monthAbbrs',
+			'l' => 'dayNames',
+			'D' => 'dayAbbrs',
+			'a' => 'meridiums',
+			'A' => 'meridiums',
+		);
+		
+		foreach($ltrKeys as $ltr => $key) {
+			$a = self::$dateConversion[$ltr];
+			if(strpos($f, $ltr) !== false || strpos($f, $a[0]) !== false || strpos($f, $a[1]) !== false) {
+				$keys[] = $key;
+			}
+		}
+		
+		foreach($keys as $key) {
+			$findReplace = array_merge($findReplace, $this->dateWords($key));
+		}
+
+		if(count($findReplace)) {
+			$find = array_keys($findReplace);
+			$replace = array_values($findReplace);
+			if($find != $replace) {
+				$value = str_replace($find, $replace, $value);
+			}
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Get translated month/day words indexed by English words
+	 * 
+	 * @param string $key One of: monthNames, monthAbbrs, dayNames, dayAbbrs, meridiums
+	 * @return array
+	 * 
+	 */
+	protected function dateWords($key) {
+		$k = $key . $this->wire()->user->language->id;
+		switch($key) {
+			case 'monthNames':
+				if(empty($this->caches[$k])) $this->caches[$k] = array(
+					'January' => $this->_('January'),
+					'February' => $this->_('February'),
+					'March' => $this->_('March'),
+					'April' => $this->_('April'),
+					'May' => $this->_('May'),
+					'June' => $this->_('June'),
+					'July' => $this->_('July'),
+					'August' => $this->_('August'),
+					'September' => $this->_('September'),
+					'October' => $this->_('October'),
+					'November' => $this->_('November'),
+					'December' => $this->_('December'),
+				);
+				return $this->caches[$k];
+			case 'monthAbbrs':
+				if(empty($this->caches[$k])) $this->caches[$k] = array(
+					'Jan' => $this->_x('Jan', 'month-abbr'),
+					'Feb' => $this->_x('Feb', 'month-abbr'),
+					'Mar' => $this->_x('Mar', 'month-abbr'),
+					'Apr' => $this->_x('Apr', 'month-abbr'),
+					'May' => $this->_x('May', 'month-abbr'),
+					'Jun' => $this->_x('Jun', 'month-abbr'),
+					'Jul' => $this->_x('Jul', 'month-abbr'),
+					'Aug' => $this->_x('Aug', 'month-abbr'),
+					'Sep' => $this->_x('Sep', 'month-abbr'),
+					'Oct' => $this->_x('Oct', 'month-abbr'),
+					'Nov' => $this->_x('Nov', 'month-abbr'),
+					'Dec' => $this->_x('Dec', 'month-abbr'),
+				);
+				return $this->caches[$k];
+			case 'dayNames':
+				if(empty($this->caches[$k])) $this->caches[$k] = array(
+					'Monday' => $this->_('Monday'),
+					'Tuesday' => $this->_('Tuesday'),
+					'Wednesday' => $this->_('Wednesday'),
+					'Thursday' => $this->_('Thursday'),
+					'Friday' => $this->_('Friday'),
+					'Saturday' => $this->_('Saturday'),
+					'Sunday' => $this->_('Sunday'),
+				);
+				return $this->caches[$k];
+			case 'dayAbbrs':
+				if(empty($this->caches[$k])) $this->caches[$k] = array(
+					'Mon' => $this->_x('Mon', 'day-abbr'),
+					'Tue' => $this->_x('Tue', 'day-abbr'),
+					'Wed' => $this->_x('Wed', 'day-abbr'),
+					'Thu' => $this->_x('Thu', 'day-abbr'),
+					'Fri' => $this->_x('Fri', 'day-abbr'),
+					'Sat' => $this->_x('Sat', 'day-abbr'),
+					'Sun' => $this->_x('Sun', 'day-abbr'),
+				);
+				return $this->caches[$k];
+			case 'meridiums':
+				if(empty($this->caches[$k])) $this->caches[$k] = array(
+					'am' => $this->_x('am', 'ante-meridium-lowercase'),
+					'pm' => $this->_x('pm', 'post-meridium-lowercase'),
+					'AM' => $this->_x('AM', 'ante-meridium-uppercase'),
+					'PM' => $this->_x('PM', 'post-meridium-uppercase'),
+				);
+				return $this->caches[$k];
+		}
+		return array();
+	}
 }

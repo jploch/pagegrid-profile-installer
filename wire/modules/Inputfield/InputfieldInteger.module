@@ -70,14 +70,14 @@ class InputfieldInteger extends Inputfield {
 		} else {
 			// input[type=number] unset any that aren't applicable
 			foreach(array('min', 'max', 'step') as $name) {
-				if(!strlen((string) $attrs[$name])) unset($attrs[$name]);
+				if(isset($attrs[$name]) && !strlen((string) $attrs[$name])) unset($attrs[$name]);
 			}
 		}
 
-		if(!strlen($attrs['value'])) { 
-			if(strlen($this->initValue)) {
+		if(!strlen("$attrs[value]")) { 
+			if(strlen("$this->initValue")) {
 				$attrs['value'] = (int) $this->initValue; // Inputfield-only version
-			} else if(strlen($this->defaultValue)) {
+			} else if(strlen("$this->defaultValue")) {
 				$attrs['value'] = (int) $this->defaultValue; // Fieldtype version
 			}
 		}

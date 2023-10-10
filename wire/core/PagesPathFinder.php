@@ -721,7 +721,7 @@ class PagesPathFinder extends Wire {
 		$_path = $path;
 		if(strlen($appendPath)) $path = rtrim($path, '/') . $appendPath;
 		
-		if($fail || $_path !== $path) {
+		if($fail || $_path !== $path || ($hadTrailingSlash && $useTrailingSlash < 0)) {
 			if($fail && isset($result['errors']['indexFile']) && count($result['urlSegments']) === 1) {
 				// allow for an /index.php or /index.html type urlSegmentStr to redirect rather than fail
 				$fail = false;
@@ -1422,9 +1422,8 @@ class PagesPathFinder extends Wire {
 			$this->admin = true;
 		} else {
 			$template = $this->getResultTemplate();
-			if(!$template) {
-				return false; // may need to detect later
-			} if(in_array($template->name, $config->adminTemplates, true)) {
+			if(!$template) return false; // may need to detect later
+			if(in_array($template->name, $config->adminTemplates, true)) {
 				$this->admin = true;
 			} else if(in_array($template->name, array('user', 'role', 'permission', 'language'))) {
 				$this->admin = true;

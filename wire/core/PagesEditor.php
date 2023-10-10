@@ -39,7 +39,7 @@ class PagesEditor extends Wire {
 		$this->pages = $pages;
 
 		$config = $pages->wire()->config;
-		if($config->dbStripMB4 && strtolower($config->dbEngine) != 'utf8mb4') {
+		if($config->dbStripMB4 && strtolower($config->dbCharset) != 'utf8mb4') {
 			$this->addHookAfter('Fieldtype::sleepValue', $this, 'hookFieldtypeSleepValueStripMB4');
 		}
 	}
@@ -363,7 +363,7 @@ class PagesEditor extends Wire {
 
 		// assign sort order
 		if($page->sort < 0) {
-			$page->sort = $page->parent->numChildren();
+			$page->sort = ($parent->id ? $parent->numChildren() : 0);
 		}
 
 		// assign any default values for fields
@@ -419,7 +419,7 @@ class PagesEditor extends Wire {
 	 * 	- `uncacheAll` (boolean): Whether the memory cache should be cleared (default=true)
 	 * 	- `resetTrackChanges` (boolean): Whether the page's change tracking should be reset (default=true)
 	 * 	- `quiet` (boolean): When true, created/modified time+user will use values from $page rather than current user+time (default=false)
-	 *	- `adjustName` (boolean): Adjust page name to ensure it is unique within its parent (default=false)
+	 *	- `adjustName` (boolean): Adjust page name to ensure it is unique within its parent (default=true)
 	 * 	- `forceID` (integer): Use this ID instead of an auto-assigned on (new page) or current ID (existing page)
 	 * 	- `ignoreFamily` (boolean): Bypass check of allowed family/parent settings when saving (default=false)
 	 *  - `noHooks` (boolean): Prevent before/after save hooks from being called (default=false)
@@ -433,7 +433,7 @@ class PagesEditor extends Wire {
 		$defaultOptions = array(
 			'uncacheAll' => true,
 			'resetTrackChanges' => true,
-			'adjustName' => false,
+			'adjustName' => true,
 			'forceID' => 0,
 			'ignoreFamily' => false,
 			'noHooks' => false, 
@@ -447,9 +447,9 @@ class PagesEditor extends Wire {
 		$language = null;
 
 		// if language support active, switch to default language so that saved fields and hooks don't need to be aware of language
-		if($languages && $page->id != $user->id) {
-			$language = $user->language && $user->language->id ? $user->language : null;
-			if($language) $user->language = $languages->getDefault();
+		if($languages && $page->id != $user->id && "$user->language") {
+			$language = $user->language;
+			$user->setLanguage($languages->getDefault());
 		}
 
 		$reason = '';
@@ -457,8 +457,8 @@ class PagesEditor extends Wire {
 		if($isNew) $this->pages->setupNew($page);
 
 		if(!$this->isSaveable($page, $reason, '', $options)) {
-			if($language) $user->language = $language;
-			throw new WireException("Can’t save page {$page->id}: {$page->path}: $reason");
+			if($language) $user->setLanguage($language);
+			throw new WireException(rtrim("Can’t save page (id=$page->id): $page->path", ": ") . ": $reason");
 		}
 
 		if($page->hasStatus(Page::statusUnpublished) && $page->template->noUnpublish) {
@@ -473,10 +473,10 @@ class PagesEditor extends Wire {
 			}
 		}
 
-		$this->pages->names()->checkNameConflicts($page);
+		if($options['adjustName']) $this->pages->names()->checkNameConflicts($page);
 		if(!$this->savePageQuery($page, $options)) return false;
 		$result = $this->savePageFinish($page, $isNew, $options);
-		if($language) $user->language = $language; // restore language
+		if($language) $user->setLanguage($language); // restore language
 		
 		return $result;
 	}
@@ -1280,11 +1280,13 @@ class PagesEditor extends Wire {
 
 		if($options['recursionLevel'] === 0) {
 			// update pages_parents table, only when at recursionLevel 0 since parents()->rebuild() already descends 
+			/*
 			if($copy->numChildren) {
 				$copy->setIsNew(true);
 				$this->pages->parents()->rebuild($copy);
 				$copy->setIsNew(false);
 			}
+			*/
 			// update sort
 			if($copy->parent()->sortfield() == 'sort') {
 				$this->sortPage($copy, $copy->sort, true);

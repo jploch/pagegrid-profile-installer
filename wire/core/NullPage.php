@@ -25,7 +25,7 @@
  * Placeholder class for non-existant and non-saveable Page.
  * Many API functions return a NullPage to indicate no match. 
  *
- * ProcessWire 3.x, Copyright 2016 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  * https://processwire.com
  * 
  * @property int $id The id property will always be 0 for a NullPage. 
@@ -77,7 +77,9 @@ class NullPage extends Page implements WireNull {
 	 * @throws WireException
 	 * 
 	 */
-	public function parents($selector = '') { return $this->wire('pages')->newPageArray(); }
+	public function parents($selector = '') { 
+		return $this->wire()->pages->newPageArray(); 
+	}
 
 	/**
 	 * #pw-internal
@@ -97,6 +99,14 @@ class NullPage extends Page implements WireNull {
 
 	/**
 	 * #pw-internal
+	 *
+	 * @return bool
+	 *
+	 */
+	public function isNew() { return false; }
+
+	/**
+	 * #pw-internal
 	 * 
 	 * @return null
 	 * 
@@ -110,7 +120,22 @@ class NullPage extends Page implements WireNull {
 	 * @throws WireException
 	 * 
 	 */
-	public function ___rootParent() { return $this->wire('pages')->newNullPage(); }
+	public function ___rootParent() { 
+		return $this->wire()->pages->newNullPage(); 
+	}
+
+	/**
+	 * #pw-internal
+	 * 
+	 * @param string $selector
+	 * @param bool $includeCurrent
+	 * @return PageArray
+	 * @throws WireException
+	 * 
+	 */
+	public function siblings($selector = '', $includeCurrent = true) { 
+		return $this->wire()->pages->newPageArray(); 
+	}
 
 	/**
 	 * #pw-internal
@@ -121,18 +146,9 @@ class NullPage extends Page implements WireNull {
 	 * @throws WireException
 	 * 
 	 */
-	public function siblings($selector = '', $options = array()) { return $this->wire('pages')->newPageArray(); }
-
-	/**
-	 * #pw-internal
-	 * 
-	 * @param string $selector
-	 * @param array $options
-	 * @return PageArray
-	 * @throws WireException
-	 * 
-	 */
-	public function children($selector = '', $options = array()) { return $this->wire('pages')->newPageArray(); }
+	public function children($selector = '', $options = array()) { 
+		return $this->wire()->pages->newPageArray(); 
+	}
 
 	/**
 	 * #pw-internal
@@ -142,7 +158,9 @@ class NullPage extends Page implements WireNull {
 	 * @throws WireException
 	 * 
 	 */
-	public function getAccessParent($type = 'view') { return $this->wire('pages')->newNullPage(); }
+	public function getAccessParent($type = 'view') { 
+		return $this->wire()->pages->newNullPage(); 
+	}
 
 	/**
 	 * #pw-internal
@@ -152,7 +170,9 @@ class NullPage extends Page implements WireNull {
 	 * @throws WireException
 	 * 
 	 */
-	public function getAccessRoles($type = 'view') { return $this->wire('pages')->newPageArray(); }
+	public function getAccessRoles($type = 'view') { 
+		return $this->wire()->pages->newPageArray(); 
+	}
 
 	/**
 	 * #pw-internal
@@ -173,4 +193,3 @@ class NullPage extends Page implements WireNull {
 	 */
 	public function isChanged($what = '') { return false; }
 }
-

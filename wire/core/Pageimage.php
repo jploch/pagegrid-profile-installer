@@ -547,6 +547,13 @@ class Pageimage extends Pagefile {
 			$a = @simplexml_load_string($xml)->attributes();
 			if((int) $a->width > 0) $width = (int) $a->width;
 			if((int) $a->height > 0) $height = (int) $a->height;
+			if((!$width || !$height) && $a->viewBox) {
+				$values = explode(' ', $a->viewBox);
+				if(count($values) === 4) {
+					$width = (int) round($values[2]);
+					$height = (int) round($values[3]);
+				}
+			}
 		}
 		
 		if((!$width || !$height) && (extension_loaded('imagick') || class_exists('\IMagick'))) {
@@ -1321,16 +1328,17 @@ class Pageimage extends Pagefile {
 	/**
 	 * Get ratio of width divided by height
 	 * 
+	 * @param int $precision Optionally specify a value >2 for custom precision (default=2) 3.0.211+
 	 * @return float
 	 * @since 3.0.154
 	 * 
 	 */
-	public function ratio() {
+	public function ratio($precision = 2) {
 		$width = $this->width();
 		$height = $this->height();
 		if($width === $height) return 1.0;
 		$ratio = $width / $height;
-		$ratio = round($ratio, 2);
+		$ratio = round($ratio, max(2, (int) $precision));
 		if($ratio > 99.99) $ratio = 99.99; // max allowed width>height ratio
 		if($ratio < 0.01) $ratio = 0.01; // min allowed height>width ratio
 		return $ratio;
@@ -1628,8 +1636,7 @@ class Pageimage extends Pagefile {
 			}
 		}
 
-		/** @var Sanitizer $sanitizer */
-		$sanitizer = $this->wire('sanitizer');
+		$sanitizer = $this->wire()->sanitizer;
 		$image = $this;
 		$original = null;
 		$replacements = array();
@@ -1662,7 +1669,7 @@ class Pageimage extends Pagefile {
 		}
 		
 		if(strpos($markup, '{class}')) {
-			$class = isset($options['class']) ? $this->wire('sanitizer')->entities($options['class']) : 'pw-pageimage';
+			$class = isset($options['class']) ? $sanitizer->entities($options['class']) : 'pw-pageimage';
 			$replacements["{class}"] = $class; 
 		}
 		
@@ -1710,7 +1717,7 @@ class Pageimage extends Pagefile {
 		$webp = $this->extras('webp');
 		if(!$webp) {
 			$webp = new PagefileExtra($this, 'webp');
-			$webp->setArray($this->wire('config')->webpOptions);
+			$webp->setArray($this->wire()->config->webpOptions);
 			$this->extras('webp', $webp);
 			$webp->addHookAfter('create', $this, 'hookWebpCreate'); 
 		}
@@ -1873,4 +1880,3 @@ class Pageimage extends Pagefile {
 	}
 
 }
-

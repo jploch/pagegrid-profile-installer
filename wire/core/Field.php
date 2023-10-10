@@ -252,6 +252,18 @@ class Field extends WireData implements Saveable, Exportable {
 	protected $tagList = null;
 
 	/**
+	 * Setup name to apply when field is saved 
+	 * 
+	 * Set via $field->type = 'FieldtypeName.setupName'; 
+	 * or applySetup() method
+	 * 
+	 * @var string 
+	 * @since 3.0.213
+	 * 
+	 */
+	protected $setupName = '';
+
+	/**
 	 * True if lowercase tables should be enforce, false if not (null = unset). Cached from $config
 	 *
 	 */
@@ -513,7 +525,14 @@ class Field extends WireData implements Saveable, Exportable {
 
 		if($this->type) {
 			$typeData = $this->type->exportConfigData($this, $data);
-			$data = array_merge($typeData, $data); // argument order reversed per #1638
+			foreach($typeData as $key => $value) {
+				if($value === null && isset($data[$key])) {
+					// prevent null from overwriting non-null, alternative for #1638
+					unset($typeData[$key]);
+				}
+			}
+			// $data = array_merge($typeData, $data); // argument order reversed per #1638...
+			$data = array_merge($data, $typeData); // ...and later un-reversed per #1792
 		}
 
 		// remove named flags from data since the 'flags' property already covers them
@@ -680,6 +699,11 @@ class Field extends WireData implements Saveable, Exportable {
 			// good for you
 
 		} else if(is_string($type)) {
+			if(strpos($type, '.')) {
+				// FieldtypeName.setupName
+				list($type, $setupName) = explode('.', $type, 2);
+				$this->setSetupName($setupName);
+			}
 			$typeStr = $type;
 			$type = $this->wire()->fieldtypes->get($type);
 			if(!$type) {
@@ -1547,6 +1571,18 @@ class Field extends WireData implements Saveable, Exportable {
 	}
 
 	/**
+	 * Set setup name from Fieldtype to apply when field is saved 
+	 * 
+	 * @param string $setupName Setup name or omit to instead get the current value
+	 * @return string Returns current value
+	 * 
+	 */
+	public function setSetupName($setupName = null) {
+		if($setupName !== null) $this->setupName = $setupName;
+		return $this->setupName;
+	}
+
+	/**
 	 * debugInfo PHP 5.6+ magic method
 	 *
 	 * This is used when you print_r() an object instance.
@@ -1579,4 +1615,3 @@ class Field extends WireData implements Saveable, Exportable {
 	}
 	
 }
-

@@ -80,6 +80,7 @@ class MarkupFieldtype extends WireData implements Module {
 	 * 
 	 */
 	public function __construct(Page $page = null, Field $field = null, $value = null) {
+		parent::__construct();
 		if($page) $this->setPage($page);
 		if($field) $this->setField($field); 
 		if(!is_null($value)) $this->setValue($value); 
@@ -112,7 +113,7 @@ class MarkupFieldtype extends WireData implements Module {
 				$valid = false;
 				if($value instanceof PageArray) {
 					// PageArray object: get array of property value from each item
-					$field = $this->wire('fields')->get($property);
+					$field = $this->wire()->fields->get($property);
 					if(is_object($field) && $field->type) {
 						$a = array();
 						foreach($value as $page) {
@@ -126,7 +127,8 @@ class MarkupFieldtype extends WireData implements Module {
 						}
 						return $this->arrayToString($a, false);
 					} else {
-						$value = $value->explode($property, array('getMethod' => 'getFormatted'));
+						$getMethod = strpos($property, '}') ? 'getText' : 'getFormatted';
+						$value = $value->explode($property, array('getMethod' => $getMethod));
 					}
 					$valid = true;
 					
@@ -139,25 +141,21 @@ class MarkupFieldtype extends WireData implements Module {
 					// Page object
 					$page = $value;
 					$value = $page->getFormatted($property);
-					$field = $this->wire('fields')->get($property);
+					$field = $this->wire()->fields->get($property);
 					if(is_object($field) && $field->type) return $field->type->markupValue($page, $field, $value);
 					$valid = true;
 				} else if($value instanceof LanguagesValueInterface) {
 					/** @var LanguagesValueInterface $value */
 					/** @var Languages $languages */
-					$languages = $this->wire('languages');
-					if($property) {
-						if($property === 'data') {
-							$languageID = $languages->getDefault()->id;	
-						} else if(is_string($property) && preg_match('/^data(\d+)$/', $property, $matches)) {
-							$languageID = (int) $matches[1];
-						} else {
-							$languageID = 0;
-						}
-						$value = $languageID ? $value->getLanguageValue($languageID) : (string) $value; 
+					$languages = $this->wire()->languages;
+					if($property === 'data') {
+						$languageID = $languages->getDefault()->id;	
+					} else if(is_string($property) && preg_match('/^data(\d+)$/', $property, $matches)) {
+						$languageID = (int) $matches[1];
 					} else {
-						$value = (string) $value;
+						$languageID = 0;
 					}
+					$value = $languageID ? $value->getLanguageValue($languageID) : (string) $value; 
 					
 				} else if($value instanceof WireData) {
 					// WireData object
@@ -268,14 +266,14 @@ class MarkupFieldtype extends WireData implements Module {
 	 * 
 	 */	
 	protected function valueToString($value, $encode = true) {
-		if(is_object($value) && ($value instanceof Pagefiles || $value instanceof Pagefile)) {
+		if($value instanceof Pagefiles || $value instanceof Pagefile) {
 			return $this->objectToString($value);
 		} else if(WireArray::iterable($value)) {
 			return $this->arrayToString($value);
 		} else if(is_object($value)) {
 			return $this->objectToString($value);
 		} else {
-			return $encode ? $this->wire('sanitizer')->entities1($value) : $value;
+			return $encode ? $this->wire()->sanitizer->entities1($value) : $value;
 		}
 	}
 
@@ -392,7 +390,7 @@ class MarkupFieldtype extends WireData implements Module {
 	
 	public function setPage(Page $page) { $this->_page = $page;  }
 	public function setField(Field $field) { $this->_field = $field;  }
-	public function getPage() { return $this->_page ? $this->_page : $this->wire('pages')->newNullPage(); }
+	public function getPage() { return $this->_page ? $this->_page : $this->wire()->pages->newNullPage(); }
 	public function getField() { return $this->_field; }
 
 	/**

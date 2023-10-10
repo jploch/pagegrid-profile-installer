@@ -3,7 +3,7 @@
 /**
  * ProcessWire shutdown handler
  *
- * ProcessWire 3.x, Copyright 2021 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  *  
  * Look for errors at shutdown and log them, plus echo the error if the page is editable
  *
@@ -115,6 +115,7 @@ class WireShutdown extends Wire {
 		register_shutdown_function(array($this, 'shutdown'));
 		// If script is being called externally, add an extra shutdown function 
 		if(!$config->internal) register_shutdown_function(array($this, 'shutdownExternal'));
+		parent::__construct();
 	}
 
 	/**
@@ -212,8 +213,7 @@ class WireShutdown extends Wire {
 	 * 
 	 */
 	protected function getWireInput() {
-		/** @var WireInput $input */
-		$input = $this->wire('input');
+		$input = $this->wire()->input;
 		if($input) return $input;
 		$input = $this->wire(new WireInput());
 		return $input;
@@ -227,8 +227,7 @@ class WireShutdown extends Wire {
 	 */
 	protected function getCurrentUrl() {
 		
-		/** @var Page|null $page */
-		$page = $this->wire('page');
+		$page = $this->wire()->page;
 		$input = $this->getWireInput();
 		$http = isset($_SERVER['HTTP_HOST']) || isset($_SERVER['REQUEST_URI']); 
 		
@@ -396,7 +395,7 @@ class WireShutdown extends Wire {
 		$http = new WireHttp();
 		$codes = $http->getHttpCodes();
 		$code = 500;
-		if($this->fatalErrorResponse['code']) {;
+		if($this->fatalErrorResponse['code']) {
 			$code = (int) $this->fatalErrorResponse['code'];
 		} else if($this->config) {
 			$code = (int) $this->config->fatalErrorCode;
@@ -458,7 +457,7 @@ class WireShutdown extends Wire {
 		}
 		*/
 		
-		$out = ob_get_level() ? ob_get_clean() : '';
+		$out = ob_get_level() ? (string) ob_get_clean() : '';
 		if(!strlen(trim($out))) return false;
 		
 		// if error message isn't in existing output, then return as-is
@@ -491,7 +490,7 @@ class WireShutdown extends Wire {
 		$out = str_replace($message, $token, $out);
 		
 		// replace anything else on the same line as the PHP error (error type, file, line-number)
-		$out = preg_replace('/([\r\n]|^)[^\r\n]+' . $token . '[^\r\n]*/', '', $out);
+		$out = (string) preg_replace('/([\r\n]|^)[^\r\n]+' . $token . '[^\r\n]*/', '', $out);
 
 		// ensure certain tags that could interfere with error message output are closed
 		$tags = array(
@@ -551,9 +550,12 @@ class WireShutdown extends Wire {
 		if($useHTML && $config->ajax) $useHTML = false;
 
 		// include IP address is user name if configured to do so
-		if($config->logIP && $this->wire('session')) {
-			$ip = $this->wire('session')->getIP();
-			if(strlen($ip)) $name = "$name ($ip)";
+		if($config->logIP) { 
+			$session = $this->wire()->session;
+			if($session) {
+				$ip = $session->getIP();
+				if(strlen($ip)) $name = "$name ($ip)";
+			}
 		}
 
 		// save to errors.txt log file
@@ -650,6 +652,7 @@ class WireShutdown extends Wire {
 		if(!$config->paths->logs) return false;
 		$message = str_replace(array("\n", "\t"), " ", $message);
 		try {
+			/** @var FileLog $log */
 			$log = $this->wire(new FileLog($config->paths->logs . 'errors.txt'));
 			$log->setDelimeter("\t");
 			$saved = $log->save("$userName\t$url\t$message"); 
@@ -779,8 +782,7 @@ class WireShutdown extends Wire {
 	public function shutdownExternal() {
 		if(error_get_last()) return;
 		/** @var ProcessPageView $process */
-		$process = $this->wire('process');
+		$process = $this->wire()->process;
 		if($process == 'ProcessPageView') $process->finished();
 	}
 }
-

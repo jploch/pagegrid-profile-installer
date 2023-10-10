@@ -5,7 +5,7 @@
  * 
  * Includes methods for random strings, numbers, arrays and passwords. 
  *
- * ProcessWire 3.x, Copyright 2018 by Ryan Cramer
+ * ProcessWire 3.x, Copyright 2023 by Ryan Cramer
  * https://processwire.com
  * 
  * @since 3.0.111
@@ -398,7 +398,6 @@ class WireRandom extends Wire {
 		$count = count($a);
 		$keys = array_keys($a);
 		$items = array();
-		$item = null;
 		$keepKeys = true;
 
 		// if getArray option not specified, auto determine from qty
@@ -475,7 +474,6 @@ class WireRandom extends Wire {
 	 * 
 	 */
 	public function arrayKey(array $a) {
-		$options['getKey'] = true;
 		return $this->arrayItem($a, array('getKey' => true));
 	}
 
@@ -642,7 +640,7 @@ class WireRandom extends Wire {
 			$numUpper = $this->integer($options['minUpper'], $options['maxUpper']);
 			if($numUpper) {
 				$value = strtolower($value);
-				$test = $this->wire('sanitizer')->alpha($value);
+				$test = $this->wire()->sanitizer->alpha($value);
 				if(strlen($test) < $numUpper) {
 					// there aren't enough characters present to meet requirements, so add some	
 					$value .= $this->alpha($numUpper - strlen($test), array('disallow' => $disallow));
@@ -674,7 +672,7 @@ class WireRandom extends Wire {
 
 		// manage quantity of required digits
 		if($options['minDigits'] > 0) {
-			$test = $this->wire('sanitizer')->digits($value);
+			$test = $this->wire()->sanitizer->digits($value);
 			$test = str_replace($options['disallow'], '', $test);
 			$numDigits = $options['minDigits'] - strlen($test);
 			if($numDigits > 0) {

@@ -17,6 +17,7 @@
  * @property bool $isLoggedIn
  * @property bool|string $isModal
  * @property bool|int $useAsLogin
+ * @property string $browserTitle Optional custom browser title for this request (3.0.217+)
  * @method array getUserNavArray()
  * @method array getPrimaryNavArray()
  * @method string renderFile($basename, array $vars = [])
@@ -93,6 +94,7 @@ abstract class AdminThemeFramework extends AdminTheme {
 	public function __construct() {
 		parent::__construct();
 		$this->set('useAsLogin', false);
+		$this->set('browserTitle', ''); 
 	}
 	
 	public function wired() {
@@ -262,7 +264,8 @@ abstract class AdminThemeFramework extends AdminTheme {
 		$input = $this->wire()->input;
 
 		if(!$this->isEditor) return array();
-		if($page->name != 'page' || $input->urlSegment1 || $input->get('modal')) return array();
+		if($page->name != 'page' && $page->name != 'list') return array();
+		if($input->urlSegment1 || $input->get('modal')) return array();
 		if(strpos($process, 'ProcessPageList') !== 0) return array();
 
 		/** @var ProcessPageAdd $module */
@@ -579,6 +582,9 @@ abstract class AdminThemeFramework extends AdminTheme {
 	 *
 	 */
 	public function getBrowserTitle() {
+		
+		$browserTitle = $this->browserTitle; // custom defined browser title
+		if(strlen($browserTitle)) return $this->sanitizer->entities($browserTitle);
 
 		$browserTitle = $this->wire('processBrowserTitle');
 		$modal = $this->wire()->input->get('modal');
@@ -936,4 +942,3 @@ abstract class AdminThemeFramework extends AdminTheme {
 	}
 
 }
-

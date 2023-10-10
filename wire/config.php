@@ -46,28 +46,40 @@ if(!defined("PROCESSWIRE")) die();
  * always have this disabled for live/production sites since it reveals more information
  * than is advisible for security. 
  * 
- * You may also set this to the constant `Config::debugVerbose` to enable verbose debug mode,
- * which uses more memory and time. 
+ * You may also set this to one of the constants:
+ * - `Config::debugVerbose` (or int `2`) for verbose debug mode, which uses more memory/time. 
+ * - `Config::debugDev` (or string `dev`) for core development debug mode, which makes it use
+ *    newer JS libraries in some cases when we are testing them. 
  * 
  * #notes This enables debug mode for ALL requests. See the debugIf option for an alternative.
  * 
- * @var bool
+ * @var bool|string|int 
  *
  */
 $config->debug = false;
 
 /**
  * Enable debug mode if condition is met
+ * 
+ * ~~~~~
+ * $config->debug = false; // setting this to false required when using debugIf
+ * $config->debugIf = '123.123.123.123'; // true if user matches this IP address
+ * $config->debugIf = [ '123.123.123.123', '456.456.456.456' ]; // array of IPs (3.0.212)+
+ * $config->debugIf = 'function_name_to_call'; // callable function name
+ * $config->debugIf = function() { // callable function (3.0.212+)
+ *   return $_SERVER['SERVER_PORT'] === '8888'; 
+ * }; 
+ * ~~~~~
  *
  * Set debug mode to be false above, and then specify any one of the following here:
- * 1) IP address of user required to enable debug mode;
- * 2) Your own callable function name (i.e. "debug_mode") in /site/config.php that returns
- * true or false for debug mode;
- * 3) PCRE regular expression to match IP address of user (must start and end with a "/"
- * slash). If IP address matches, then debug mode is enabled. Regular expression
- * example: /^123\.456\.789\./ would match all IP addresses that started with 123.456.789.
+ * - IP address of user required to enable debug mode;
+ * - Array of IP addresses where that debug mode should be enabled for (3.0.212+).
+ * - Your own callable function in /site/config.php that returns true or false for debug mode.
+ * - PCRE regular expression to match IP address of user (must start and end with a "/"
+ *   slash). If IP address matches, then debug mode is enabled. Regular expression
+ *   example: `/^123\.456\.789\./` would match all IP addresses that started with 123.456.789.
  * 
- * #notes When used, this overrides $config->debug, changing it at runtime automatically. 
+ * #notes When used, this will override a false $config->debug, changing it at runtime automatically. 
  * @var string
  *
  */
@@ -215,6 +227,36 @@ $config->usePageClasses = false;
 $config->useLazyLoading = true;
 
 /**
+ * Default value for $useVersion argument of $config->versionUrls() method
+ * 
+ * Controls the cache busting behavior of the `$config->versionUrls()` method as used by
+ * ProcessWire’s admin themes (but may be used independently as well). When no 
+ * `$useVersion` argument is specified to the versionUrls() method, it will use the 
+ * default value specified here. If not specified, null is the default. 
+ * 
+ * - `true` (bool): Get version from filemtime.
+ * - `false` (bool): Never get file version, just use `$config->version`.
+ * - `foobar` (string): Specify any string to be the version to use on all URLs needing it.
+ * - `?foo=bar` (string): Optionally specify your own query string variable=value. 
+ * - `null` (null): Auto-detect: use file version in debug mode or dev branch only, 
+ *    otherwise use `$config->version`.
+ * 
+ * ~~~~~
+ * // choose one to start with, copy and place in /site/config.php to enable
+ * $config->useVersionUrls = null; // default setting
+ * $config->useVersionUrls = true; // always use filemtime based version URLs
+ * $config->useVersionUrls = false; // only use core version in URLs
+ * $config->versionUrls = 'hello-world'; // always use this string as the version
+ * $config->versionUrls = '?version=123'; // optionally specify query string var and value
+ * ~~~~~
+ * 
+ * @var null|bool|string
+ * @since 3.0.227
+ *
+ * $config->useVersionUrls = null;
+ */
+
+/**
  * Disable all HTTPS requirements?
  * 
  * Use this option only for development or staging environments, on sites where you are 
@@ -304,8 +346,8 @@ $config->sessionExpireSeconds = 86400;
  * Use this to determine at runtime whether or not a session is allowed for the current request. 
  * Otherwise, this should always be boolean TRUE. When using this option, we recommend 
  * providing a callable function like below. Make sure that you put in some logic to enable
- * sessions on admin pages at minimum. The callable function receives a single $wire argument
- * which is the ProcessWire instance. 
+ * sessions on admin pages at minimum. The callable function receives a single $session argument
+ * which is the ProcessWire Session instance. 
  * 
  * Note that the API is not fully ready when this function is called, so the current $page and
  * the current $user are not yet known, nor is the $input API variable available. 
@@ -688,7 +730,7 @@ $config->contentTypes = array(
 	'txt' => 'text/plain', 
 	'json' => 'application/json',
 	'xml' => 'application/xml', 
-	);
+);
 
 /**
  * File content types
@@ -721,7 +763,7 @@ $config->fileContentTypes = array(
 	'webp' => 'image/webp',
 	'zip' => '+application/zip',
 	'mp3' => 'audio/mpeg',
-	);
+);
 
 /**
  * Named predefined image sizes and options
@@ -785,7 +827,7 @@ $config->imageSizerOptions = array(
 	'hidpiQuality' => 60, // Same as above quality setting, but specific to hidpi images
 	'defaultGamma' => 2.0, // defaultGamma: 0.5 to 4.0 or -1 to disable gamma correction (default=2.0)
 	'webpAdd' => false, // set this to true, if the imagesizer engines should create a Webp copy with every (new) image variation
-	);
+);
 
 /**
  * Options for webp images
@@ -803,7 +845,7 @@ $config->webpOptions = array(
 	'useSrcExt' => false, // Use source file extension in webp filename? (file.jpg.webp rather than file.webp)
 	'useSrcUrlOnSize' => true, // Fallback to source file URL when webp file is larger than source?
 	'useSrcUrlOnFail' => true, // Fallback to source file URL when webp file fails for some reason?
-	);
+);
 
 /**
  * Admin thumbnail image options
@@ -834,7 +876,7 @@ $config->adminThumbOptions = array(
 	'sharpening' => 'soft', // sharpening: none | soft | medium | strong
 	'quality' => 90,
 	'suffix' => '', 
-	);
+);
 
 /**
  * File compiler options (as used by FileCompiler class)
@@ -863,7 +905,7 @@ $config->fileCompilerOptions = array(
 	'exclusions' => array(), // exclude filenames or paths that start with any of these
 	'extensions' => array('php', 'module', 'inc'), // file extensions we compile
 	'cachePath' => '', // path where compiled files are stored, or blank for $config->paths->cache . 'FileCompiler/'
-	);
+);
 
 /**
  * Temporary directory for uploads
@@ -1650,14 +1692,15 @@ $config->modals = array(
  * This is an optimization that can reduce some database overhead. 
  *
  * @var array
+ * @deprecated No longer in use as of 3.0.218
  *
  */
 $config->preloadCacheNames = array(
-	'Modules.info',
+	//'Modules.info',
 	//'ModulesVerbose.info',
-	'ModulesVersions.info',
-	'Modules.wire/modules/',
-	'Modules.site/modules/',
+	//'ModulesVersions.info',
+	//'Modules.wire/modules/',
+	//'Modules.site/modules/',
 );
 
 /**
