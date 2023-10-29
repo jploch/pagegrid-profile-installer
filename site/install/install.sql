@@ -483,7 +483,7 @@ CREATE TABLE `field_pg_text` (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
 
 INSERT INTO `field_pg_text` (`pages_id`, `data`) VALUES('1299', '<p>Edit</p>');
-INSERT INTO `field_pg_text` (`pages_id`, `data`) VALUES('1301', 'Thank for using PAGEGRID! This is just some dummy content. Click twice to edit this text or click the trash icon above it to delete it.<br /><br />You can add new items by dragging the icons on the left on to the page.');
+INSERT INTO `field_pg_text` (`pages_id`, `data`) VALUES('1301', 'Thanks for using PAGEGRID! This is just some dummy content. Click twice to edit this text or click the trash icon above it to delete it.<br /><br />You can add new items by dragging the icons on the left onto the page.');
 
 DROP TABLE IF EXISTS `field_pg_video`;
 CREATE TABLE `field_pg_video` (
