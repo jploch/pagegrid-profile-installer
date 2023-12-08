@@ -452,6 +452,17 @@ class InputfieldPageGrid extends Inputfield {
         return $out;
     }
 
+    //disable automatic prepending/appending of template file
+    public function noAppendFile($p) {
+        if (!$p->template->noAppendTemplateFile) {
+            $p->template->noAppendTemplateFile = 1;
+            $p->template->noPrependTemplateFile = 1;
+            $p->template->appendFile = "";
+            $p->template->prependFile = "";
+            $p->template->save();
+        }
+    }
+
     public function renderItem($p) {
 
         //check if symbol page was found
@@ -479,13 +490,12 @@ class InputfieldPageGrid extends Inputfield {
         //END force autonaming for all children if only one template selected
 
         //disable automatic prepending/appending of template file
-        $p->template->noAppendTemplateFile = 1;
-        $p->template->noPrependTemplateFile = 1;
-        $p->template->appendFile = "";
-        $p->template->prependFile = "";
-        $p->template->tags = 'pagegrid';
-        $p->template->save();
-        //END automatic prepending/appending of template file
+        $this->noAppendFile($p);
+
+        if ($p->template->tags !== 'Blocks') {
+            $p->template->tags = 'Blocks';
+            $p->template->save();
+        }
 
         $backend = $this->isBackend();
 
@@ -557,15 +567,6 @@ class InputfieldPageGrid extends Inputfield {
                             if (isset($rtOptions) && isset($rtOptions->forced_root_block) && $rtOptions->forced_root_block) {
                                 $rtWrapTag = '<' . $rtOptions->forced_root_block . '>';
                                 $rtWrapTagClose = '</' . $rtOptions->forced_root_block . '>';
-
-                                //combine "valid_elements" without allowing the "forced_root_block" element, to be able to have plain textfields with linebreaks
-                                if (isset($rtOptions->valid_elements)) {
-                                    $validElements = explode(',', $rtOptions->valid_elements);
-                                    if (!in_array($rtOptions->forced_root_block, $validElements)) {
-                                        $rtWrapTag = '';
-                                        $rtWrapTagClose = '';
-                                    }
-                                }
                             }
                         }
                         //END change wrap tag based on InputfieldTinyMCE JSON settings
@@ -578,6 +579,23 @@ class InputfieldPageGrid extends Inputfield {
             }
         }
         //END prefil inline fields with dummy content
+
+        //prevent bug with div nested in p if block has <p> as wrapper
+        //div is needed for inline editor to work
+        foreach ($p->template->fields as $field) {
+            if ($field->inputfieldClass !== 'InputfieldTinyMCE') continue;
+            if (!$field->settingsJSON) continue;
+            $rtOptions = json_decode($field->settingsJSON);
+            $fieldName = $field->name;
+            if (isset($rtOptions) && isset($rtOptions->forced_root_block) && $rtOptions->forced_root_block === 'div' && $p->$fieldName) {
+                $validElements = isset($rtOptions->valid_elements) ? explode(' ', $this->sanitizer->words($rtOptions->valid_elements)) : [];
+                if (($key = array_search('div', $validElements)) !== false) {
+                    if (!$this->user->isLoggedin() || (!$backend && $this->ft->inlineEditorFrontDisable)) unset($validElements[$key]);
+                }
+                $p->$fieldName = strip_tags($p->getFormatted($fieldName), $validElements);;
+            }
+        }
+        //prevent bug with div nested in p if block has <p> as wrapper
 
         //Read item Settings
         $attributes = '';
@@ -612,21 +630,142 @@ class InputfieldPageGrid extends Inputfield {
         //make sure outpuformatting is on before render
         $p->of(true);
 
+        //new set render options
+        // $this->setRenderOptions($p, $templateRender);
+
+        //disable inline edit for frontend, when inlineEditorFrontDisable = true
+        if (!$backend && $this->ft->inlineEditorFrontDisable) $p->edit(false);
         // parse template markup and inssert file uploader
         $templateRender = $parsedTemplate->render();
         $templateRender = $this->ft->enableInlineEditFile($templateRender);
 
+        $docHtml = new \DOMDocument();
+        @$docHtml->loadHTML('<?xml encoding="utf-8" ?><html>' . $templateRender . '</html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $tag = $docHtml->getElementsByTagName('pg-data') ? $docHtml->getElementsByTagName('pg-data')[0] : 0;
+        $options = $tag ? json_decode($tag->getAttribute('pg-data-options')) : [];
+        $tagNameSaved = $this->getTagName($p);
+        $tagName = $tagNameSaved;
+        $classes = $this->getCssClasses($p);
+
+        //tagname
+        if ($tag && isset($options->tag)) {
+            $tagName = $this->sanitizer->htmlClass($options->tag);
+            $tagName = strtolower($tagName);
+            // replace p tag with custom el to prevent nesting bug with <p> and inline editor <div>
+            if ($tagName == 'p') {
+                if ($this->user->isLoggedin()) $tagName = 'pg-ptag';
+                if (!$backend && $this->ft->inlineEditorFrontDisable) $tagName = 'p';
+            }
+
+            //allow tags to change
+            if (isset($options->tags) && $tagNameSaved !== 'div') $tagName = $tagNameSaved;
+        }
+
+        //classes
+        if ($tag && isset($options->classes)) {
+            $classNames = $this->sanitizer->htmlClasses($options->classes);
+            $classNames = strtolower($classNames);
+            if ($classNames) $classes .= ' ' . $classNames;
+        }
+
+        //children
+        if ($tag && isset($options->children) && $options->children) {
+            $nestedClasses = 'pg pg-nested pg-droppable ';
+        }
+
+        // remove tag from render on frontend
+        // needed for js to get data in backend
+        if ($tag && !$backend) {
+            $dataTag = 'pg-data';
+            $hasOptionTags = strpos($templateRender, "<$dataTag") !== false;
+
+            if ($hasOptionTags) {
+                // remove option tags
+                $templateRender = preg_replace('!</?' . $dataTag . '(?:\s[^>]*>|>)\s*!is', '', $templateRender);
+            }
+        }
+        //END new set render options
+
         if ($backend) {
-            $layout .= '<' . $this->getTagName($p) . ' id="' . $p->name . '" data-id="' . $p->id . '" data-id-original="' . $pOriginal->id . '" class="' . $this->getCssClasses($p) . ' ' . $nestedClasses . $statusClass . '" data-template="' . $p->template->name . '" data-field="' . $this->name . '" data-name="' . $p->name . '" ' . $attributes . '>';
+            $layout .= '<' . $tagName . ' id="' . $p->name . '" data-id="' . $p->id . '" data-id-original="' . $pOriginal->id . '" class="' . $classes . ' ' . $nestedClasses . $statusClass . '" data-template="' . $p->template->name . '" data-field="' . $this->name . '" data-name="' . $p->name . '" ' . $attributes . '>';
             $layout .= '<pg-icon>' . wireIconMarkup($p->template->icon) . '</pg-icon>';
             $layout .= $header;
             $layout .= $templateRender;
-            $layout .= '</' . $this->getTagName($p) . '>';
+            $layout .= '</' . $tagName . '>';
         } else {
-            $layout = '<' . $this->getTagName($p) . ' class="' . $nestedClasses . $this->getCssClasses($p) . '" ' . $attributes . '>' .  $templateRender . '</' . $this->getTagName($p) . '>';
+            $layout = '<' . $tagName . ' class="' . $nestedClasses . $classes . '" ' . $attributes . '>' .  $templateRender . '</' . $tagName . '>';
         }
 
         return $layout;
+    }
+
+    public function setRenderOptions($p, $templateRender) {
+        //only set in backend, frontend uses saved value
+        if (!$this->isBackend()) return;
+        //Render options
+        //NEW convert options and set to meta before render
+        $docHtml = new \DOMDocument();
+        @$docHtml->loadHTML('<?xml encoding="utf-8" ?><html>' . $templateRender . '</html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $tag = $docHtml->getElementsByTagName('pg-data') ? $docHtml->getElementsByTagName('pg-data')[0] : 0;
+        $options = $tag ? json_decode($tag->getAttribute('pg-data-options')) : [];
+        $itemData = $p->meta()->pg_styles;
+        if (!$tag) return;
+        // if(!isset($options)) return;
+
+        // bd($options);
+
+        $tagNameSaved = $this->getTagName($p);
+
+        if (!isset($itemData)) {
+            $itemData = [];
+        }
+
+        if (!isset($itemData['pgitem'])) {
+            $itemData['pgitem'] = [];
+        }
+
+        //tagname
+        if (isset($options->tag)) {
+
+            $tagName = $this->sanitizer->htmlClass($options->tag);
+            $tagName = strtolower($tagName);
+
+            if (!isset($options->tags) || $tagNameSaved === 'div') {
+
+                if ($tagName && $tagName !== $tagNameSaved) {
+                    $itemData['pgitem']['tagName'] = $tagName;
+                    $p->meta()->set('pg_styles', $itemData);
+                }
+            }
+        }
+
+        //class
+        if (isset($options->class)) {
+            $class = $this->sanitizer->htmlClass($options->class);
+            $class = strtolower($class);
+
+            $classesArray = explode(' ', $this->getCssClasses($p));
+            $hasClass = 0;
+
+            foreach ($classesArray as $className) {
+                if ($class === $className) $hasClass = 1;
+            }
+
+            if (!$hasClass && isset($itemData['pgitem'])) {
+                if (isset($itemData['pgitem']['cssClasses'])) {
+                    $itemData['pgitem']['cssClasses'] = $itemData['pgitem']['cssClasses'] . ' ' . $class;
+                } else {
+                    $itemData['pgitem']['cssClasses'] = $class;
+                }
+                $p->meta()->set('pg_styles', $itemData);
+            }
+        }
+
+        //children
+        if (isset($options->children) && $options->children) {
+            $itemData['pgitem']['children'] = '1';
+            $p->meta()->set('pg_styles', $itemData);
+        }
     }
 
     //function to render file uploader
@@ -875,6 +1014,7 @@ class InputfieldPageGrid extends Inputfield {
         // if p change to custom tag to prevent html wrapping break with inline editor divs
         if ($tagName == 'p' && $this->user->isLoggedin()) {
             $tagName = 'pg-ptag';
+            if (!$this->isBackend() && $this->ft->inlineEditorFrontDisable) $tagName = 'p';
         }
 
         return $tagName;
@@ -1586,59 +1726,30 @@ class InputfieldPageGrid extends Inputfield {
         return $animationsCss;
     }
 
+    // options gets rendered inside template and read before render
+    public function renderOptions($options = []) {
+        // if (!isset($options["page"])) return;
+        // if (!$this->isBackend()) return;
+        // $item = $options["page"];
+        // if (!$item->id) return;
 
-    public function renderOptions($options = null) {
-        $renderOptions = '';
-        $backend = $this->isBackend();
+        // set id instead of page object
+        // $options["page"] = $item->id;
 
-        if ($backend) {
+        // convert array to json and set as data-atribite
+        $renderOptions = htmlspecialchars(json_encode($options), ENT_QUOTES, 'UTF-8');
 
-            if (isset($options["children"])) {
-                $renderOptions = 'data-pg-children';
-            }
-
-            if (isset($options["tags"]) && isset($options["page"])) {
-                $renderOptions .= ' data-pg-tags="' . $options["tags"] . '"';
-            }
-
-            if (isset($options["tag"]) && isset($options["page"])) {
-                $item = $options["page"];
-                $itemData = $item->meta()->pg_styles;
-                $tag = $options["tag"];
-
-                //new item to force tag
-                if (!isset($itemData)) {
-                    $renderOptions .= ' data-pg-tagName="' . $options["tag"] . '"';
-                }
-
-                if (isset($itemData)) {
-                    if (isset($itemData['pgitem'])) {
-
-                        if ($options["tag"] !== $itemData['pgitem']['tagName']) {
-                            $renderOptions .= ' data-pg-tagName="' . $options["tag"] . '"';
-
-                            if (isset($options['forceTag'])) {
-                                //save data for pages with same template
-                                $templateId = $item->template->id;
-                                $items = $this->pages->find("template=$templateId");
-
-                                foreach ($items as $p) {
-                                    $pData = $p->meta()->pg_styles;
-                                    if (isset($itemData)) {
-                                        if (isset($pData['pgitem'])) {
-                                            $pData['pgitem']['tagName'] = $options["tag"];
-                                            $p->meta()->set('pg_styles', $pData);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            // tag well be processed by js and hidden with css
-            echo '<pg-data class="pg-data"' . $renderOptions . '></pg-data>';
+        //put tags in data attribute for convenience
+        $tags = '';
+        if (isset($options["tags"]) && $this->isBackend()) {
+            $tagsValue = $this->sanitizer->htmlClasses($options["tags"]);
+            $tagsValue = strtolower($tagsValue);
+            $tags = ' data-pg-tags="' . $tagsValue . '"';
         }
+
+        // needs echo instead of return
+        // will be processed before render on itemRender()
+        echo '<pg-data class="pg-data" ' . $tags . ' pg-data-options="' . $renderOptions . '"></pg-data>';
     }
 
     //returns grandchildren. needed because of bug. $page->find('') is not returning all pages
