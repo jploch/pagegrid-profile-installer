@@ -25,50 +25,88 @@ class FieldtypePageGridConfig extends ModuleConfig {
 
 	public function setDefaults(HookEvent $event) {
 
+		//return if not module settings page
+		if (!isset($_GET['name'])) return;
+		if ($_GET['name'] !== 'FieldtypePageGrid') return;
+
 		//get config data
 		$data = $this->modules->getConfig('FieldtypePageGrid');
 		$dataOld = $data;
 
 		//install selected block modules before render so they can change main module settings
 		foreach ($this->fields->find('type=FieldtypePageGrid') as $pgf) {
+
+			//populate field settings for older pg versions
+			if (!isset($data['template_id_' . $pgf->id])) {
+				if ($pgf->template_id && is_array($pgf->template_id) && count($pgf->template_id)) {
+					$data['template_id_' . $pgf->id] = $pgf->template_id;
+					$this->modules->saveConfig('FieldtypePageGrid', $data);
+					$data = $this->modules->getConfig('FieldtypePageGrid');
+					$dataOld = $data;
+				}
+			}
+			//END populate field settings for older pg versions
+
 			if (!isset($data['template_id_' . $pgf->id])) continue;
+
 			$selectedBlocks = $data['template_id_' . $pgf->id];
+
 			if (!is_array($selectedBlocks)) continue;
-			foreach ($selectedBlocks as $templateName) {
+			foreach ($selectedBlocks as $key => $templateName) {
+				if (is_numeric($templateName)) continue;
 				$templateName = $this->sanitizer->filename($templateName);
 				$className = str_replace('pg_', '', $templateName);
 				$className = str_replace('_', '', ucwords($className, '_'));
 				$className = 'Blocks' . $className;
-				if (!$this->modules->isInstalled($className) && in_array($templateName, $selectedBlocks)) $this->modules->install($className);
+
+				//install module if not installed
+				if (!$this->modules->isInstalled($className) && in_array($templateName, $selectedBlocks)) {
+					$this->modules->install($className);
+					$data = $this->modules->getConfig('FieldtypePageGrid');
+					$dataOld = $data;
+				}
+
+				//template_id: convert name values back to ids
+				$t = $this->templates->get($templateName);
+				$filename = wire('config')->paths->templates . 'blocks/' . $templateName . '.php';
+				if ((!$t || !$t->id) && file_exists($filename)) {
+					$t = $this->createTemplate($templateName);
+				}
+
+				if ($t && $t->id) {
+					$data['template_id_' . $pgf->id][$key] = $t->id;
+					$this->modules->saveConfig('FieldtypePageGrid', $data);
+				}
+				//END template_id: convert name values back to ids
 			}
+			// bd($data['template_id_' . $pgf->id]);
 		}
 		//END install selected block modules before render so they can change main module settings
+
 
 		//set checkboxes to default
 		if ($this->modules->get('FieldtypePageGrid')->interfaceDefault) {
 			$data['interface'] = array('hideFieldTitle', 'hidePageHeadline', 'hideTitleField', 'hideTabs', 'hideSaveButton');
 			$data['interfaceDefault'] = 0;
-
-			if ($dataOld !== $data) {
-				$this->modules->saveConfig('FieldtypePageGrid', $data);
-			}
 		}
 		if ($this->modules->get('FieldtypePageGrid')->pluginsDefault) {
 			$data['plugins'] = array('lazysizes');
 			$data['pluginsDefault'] = 0;
-
-			if ($dataOld !== $data) {
-				$this->modules->saveConfig('FieldtypePageGrid', $data);
-			}
 		}
 
 		//allways add pagegrid-page
 		$pgT = $this->templates->get('pagegrid-page');
-		$pgf = $this->fields->get('PageGrid');
-		$data = $this->modules->getConfig('FieldtypePageGrid');
-		if ($pgf && $pgf->id && $pgT->id && !isset($data['addTemplate_' . $pgf->id])) {
-			$data['addTemplate_' . $pgf->id] = [];
-			$data['addTemplate_' . $pgf->id][] = $pgT->id;
+		if ($pgT && $pgT->id) {
+			$pgf = $pgT->fields->get("type=FieldtypePageGrid");
+			if ($pgf && $pgf->id) {
+				if (!isset($data['addTemplate_' . $pgf->id])) $data['addTemplate_' . $pgf->id] = [];
+				if (!in_array($pgT->id, $data['addTemplate_' . $pgf->id])) $data['addTemplate_' . $pgf->id][] = $pgT->id;
+			}
+		}
+
+
+		if ($dataOld !== $data) {
+			// bd($data);
 			$this->modules->saveConfig('FieldtypePageGrid', $data);
 		}
 
@@ -175,12 +213,12 @@ class FieldtypePageGridConfig extends ModuleConfig {
 			$validateNote = "License is valid for testing!";
 			$collapsed = 8;
 			$statusClass = 'InputfieldIsWarning';
-			$description = "Please buy a license before you launch your project. For test and staging domains you don’t need a license.";
+			$description = "Please [buy a license](https://page-grid.com/buy/) before you launch your project. For test and staging domains you don’t need a license.";
 		}
 
 		if ($valid == 3) {
 			$validateNote = "License is already in use!";
-			$description = "Please buy a license before you launch your project.";
+			$description = "Please [buy a license](https://page-grid.com/buy/) before you launch your project.";
 		}
 
 		$f = $this('modules')->get('InputfieldText');
@@ -636,14 +674,15 @@ class FieldtypePageGridConfig extends ModuleConfig {
 	public function getBlockSettings($field) {
 
 		$info = $this->modules->getModuleInfoVerbose('PageGridBlocks');
-		$downloaded = $info['name'] ? 1 : 0;
+		$downloaded = $this->modules->get('PageGridBlocks') ? 1 : 0;
 		$installed = $this->modules->isInstalled('PageGridBlocks');
 		$downloadLink = $this->config->urls->admin . 'module/edit?name=FieldtypePageGrid&collapse_info=1&downloadBlocks';
 
 		//download block module if get var is set
 		if (isset($_GET['downloadBlocks'])) {
 			$this->downloadModule('PageGridBlocks');
-			if (!$installed) $this->modules->install('PageGridBlocks');
+			$downloaded = 1;
+			// if (!$installed) $this->modules->install('PageGridBlocks');
 		}
 
 		$value = $this['template_id_' . $field->id];
@@ -654,10 +693,12 @@ class FieldtypePageGridConfig extends ModuleConfig {
 		$f->attr('name', 'template_id');
 		$f->label = $this->_('Block templates');
 		$f->icon = 'cubes';
+		if (!$installed && !$downloaded) $f->addClass('links-target-self', 'wrapClass');
+		
 		// $f->required = true;
 		$f->description = $this->_('The block template files must be placed in **site/templates/blocks/** folder. [Learn more](https://page-grid.com/docs/#/developer/blocks?id=create-a-new-block)'); // Templates selection description
 
-		if (!$installed) $f->notes .= 'Alternatively you can also download our [block modules](' . $downloadLink . ')';
+		if (!$installed && !$downloaded) $f->notes .= 'Alternatively you can also download our [block modules](' . $downloadLink . ')';
 
 		$path = wire('config')->paths->templates . 'blocks/';
 		$files = glob($path . '*.php');
@@ -669,33 +710,17 @@ class FieldtypePageGridConfig extends ModuleConfig {
 			$t = $this->templates->get($templateName);
 			$attrs = [];
 
-			if ($t && $t->id) {
-				if ($t->flags & Template::flagSystem) continue;
-				if ($t->label) $attrs['data-desc'] = $t->label;
-				if ($t->icon) $attrs['data-handle'] = wireIconMarkup($t->icon, 'fw');
-			} else {
-				//if selected and no template found
-				if (in_array($templateName, $value)) {
-
-					//create template
-					$titleField = $this->fields->get('title');
-
-					// fieldgroup for template
-					$fg = new Fieldgroup();
-					$fg->name = $templateName;
-					$fg->add($titleField);
-					$fg->save();
-
-					$t = new Template();
-					$t->name = $templateName;
-					$t->fieldgroup = $fg; // add the field group
-					// $t->icon = 'th';
-					$t->tags = 'Blocks';
-					$t->save();
-				}
+			if ((!$t || !$t->id) && in_array($templateName, $value)) {
+				$t = $this->createTemplate($templateName);
 			}
 
-			$f->addOption($templateName, $templateName, $attrs);
+			if ($t && $t->flags & Template::flagSystem) continue;
+			if ($t && $t->label) $attrs['data-desc'] = $t->label;
+			if ($t && $t->icon) $attrs['data-handle'] = wireIconMarkup($t->icon, 'fw');
+
+			$templateId = $templateName;
+			if ($t && $t->id) $templateId = $t->id;
+			$f->addOption($templateId, $templateName, $attrs);
 		}
 
 		//add module blocks
@@ -703,7 +728,7 @@ class FieldtypePageGridConfig extends ModuleConfig {
 		$files = glob($path . '*.php');
 
 		//set section 
-		if ($installed) {
+		if ($downloaded) {
 			$f->addOption('--------- Modules ---------');
 			$f->addOptionAttributes('--------- Modules ---------', ['disabled' => 'disabled']);
 		}
@@ -718,8 +743,6 @@ class FieldtypePageGridConfig extends ModuleConfig {
 			$installedBlock = $this->modules->isInstalled($className);
 			$info = $this->modules->getModuleInfoVerbose($className);
 
-			// bd($info);
-
 			//check if module exists
 			if (!$info['name']) continue;
 
@@ -729,11 +752,37 @@ class FieldtypePageGridConfig extends ModuleConfig {
 			$attrs = [];
 			$attrs['data-desc'] = $info['title'];
 			$attrs['data-handle'] = wireIconMarkup($info['icon'], 'fw');
-			$f->addOption($templateName, $templateName, $attrs);
+			$templateId = $templateName;
+			if ($this->templates->get($templateName)) $templateId = $this->templates->get($templateName)->id;
+			$f->addOption($templateId, $templateName, $attrs);
 		}
 
+		// $this['template_id_' . $field->id] = $value;
 		$f->attr('value', $value);
 		return $f;
+	}
+
+	public function createTemplate($templateName = '') {
+		if (!$templateName) return 0;
+		if ($this->templates->get($templateName)) return 0;
+
+		//create template
+		$titleField = $this->fields->get('title');
+
+		// fieldgroup for template
+		$fg = new Fieldgroup();
+		$fg->name = $templateName;
+		$fg->add($titleField);
+		$fg->save();
+
+		$t = new Template();
+		$t->name = $templateName;
+		$t->fieldgroup = $fg; // add the field group
+		// $t->icon = 'th';
+		$t->tags = 'Blocks';
+		$t->save();
+
+		return $t;
 	}
 
 	//helper to download and install missing modules
